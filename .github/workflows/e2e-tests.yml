@@ -1,0 +1,121 @@
+name: End-to-end tests
+
+on:
+  workflow_call:
+    inputs:
+      controller-image-repository:
+        description: "Define the controller container image repository"
+        type: string
+        required: false
+        default: ""
+      controller-image-tag:
+        description: "Define the controller container image tag"
+        required: false
+        type: string
+        default: ""
+      controller-container-image-artifact:
+        description: "Load the image used in the deployment from local artifact"
+        type: string
+        required: false
+        default: ""
+      policy-server-repository:
+        description: "Define the policy server container image tag"
+        type: string
+        required: false
+        default: "ghcr.io/kubewarden/policy-server"
+      policy-server-tag:
+        description: "Define the policy server container image tag"
+        type: string
+        required: false
+        default: "v0.2.5"
+      policy-server-container-image-artifact:
+        description: "Define the artifact containing the policy server container image"
+        type: string
+        required: false
+        default: ""
+      end-to-end-tests-version:
+        description: "The end-to-end tests version tag to be run"
+        type: string
+        required: false
+        default: "v0.1.0"
+
+jobs:
+  tests-kubewarden-installation:
+    name: "Kubewarden basic end-to-end tests"
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: "debug"
+        run: |
+          echo ${{ inputs.controller-image-repository }}
+          echo ${{ inputs.controller-image-tag }}
+          echo ${{ inputs.controller-container-image-artifact }}
+          echo ${{ inputs.policy-server-repository }}
+          echo ${{ inputs.policy-server-tag }}
+          echo ${{ inputs.policy-server-container-image-artifact }}
+      -
+        name: "Download end-to-end tests files"
+        uses: actions/checkout@v2
+        with:
+          repository: "kubewarden/kubewarden-end-to-end-tests"
+          ref: "${{ inputs.end-to-end-tests-version }}"
+          path: "e2e-tests"
+      -
+        name: "Create Kubernetes cluster with Kubewarden installed"
+        uses: kubewarden/install-kubewarden-action@v1
+        with:
+          controller-image-repository: ${{ inputs.controller-image-repository }}
+          controller-image-tag: ${{ inputs.controller-image-tag }}
+          controller-container-image-artifact: ${{ inputs.controller-container-image-artifact }}
+          policy-server-repository: ${{ inputs.policy-server-repository }}
+          policy-server-tag: ${{ inputs.policy-server-tag }}
+          policy-server-container-image-artifact: ${{ inputs.policy-server-container-image-artifact }}
+      -
+        name: "Install ClusterAdimissionPolicy"
+        run: kubectl apply -f e2e-tests/privileged-pod-policy.yaml
+      -
+        name: "Wait policy to be active"
+        run: kubectl  wait --for=condition=PolicyActive clusteradmissionpolicies --all
+      -
+        name: "Launch a pod which violate privileged pod policy"
+        run: kubectl apply -f e2e-tests/violate-privileged-pod-policy.yaml || exit 0
+      -
+        name: "Launch a pod which does not violate privileged pod policy"
+        run: kubectl apply -f e2e-tests/not-violate-privileged-pod-policy.yaml
+      - name: "Update privileged pod policy to check only UPDATE operations"
+        run: kubectl patch clusteradmissionpolicy privileged-pods --type=json --patch-file e2e-tests/privileged-pod-policy-patch.json
+      - name: "Launch a pod which violate privileged pod policy after policy change should work"
+        run: kubectl apply -f e2e-tests/violate-privileged-pod-policy.yaml
+      - name: "Delete ClusterAdmissionPolicy"
+        run: kubectl delete --wait -f e2e-tests/privileged-pod-policy.yaml
+      - name: "Launch a pod which violate privileged pod policy after policy deletion should work"
+        run: kubectl apply -f e2e-tests/violate-privileged-pod-policy.yaml
+      - name: "Install psp-user-group ClusterAdmissionPolicy"
+        run: kubectl apply -f e2e-tests/psp-user-group-policy.yaml
+      - name: "Wait policy to be active"
+        run: kubectl  wait --for=condition=PolicyActive clusteradmissionpolicies --all
+      - name: "Launch a pod that should be mutate by psp-user-group-policy"
+        run: |
+          kubectl apply -f e2e-tests/mutate-pod-psp-user-group-policy.yaml
+          kubectl wait --for=condition=Ready pod pause-user-group
+          eval `kubectl get pod pause-user-group -o json | jq ".spec.containers[].securityContext.runAsUser==1000"`
+      - name: "Launch second policy server"
+        run: kubectl apply -f e2e-tests/policy-server.yaml
+      - name: "Update PolicyServer"
+        run: |
+          kubectl patch policyserver default --type=merge -p '{"spec": {"replicas": 2}}'
+      - name: "All PolicyServer pods should be ready"
+        run: |
+          sleep 40s #find a better way to detect when a policy serve is ready
+          kubectl wait --timeout 2m --for=condition=Ready -n kubewarden pod --all
+      - name: "Delete policy server"
+        run: kubectl delete --wait -f e2e-tests/policy-server.yaml
+      - name: "All PolicyServer pods should be ready"
+        run: |
+          sleep 40s
+          kubectl wait --timeout 2m --for=condition=Ready -n kubewarden pod --all
+      - name: "Uninstall Kuberwarden"
+        run: |
+          # TODO - share release with the create-kubewarden-cluster action
+          helm uninstall -n kubewarden kubewarden-controller
+          helm uninstall -n kubewarden kubewarden-crds

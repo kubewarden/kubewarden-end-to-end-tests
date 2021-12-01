@@ -1,0 +1,12 @@
+[      
+ {
+  "op": "remove",
+  "path": "/spec/rules/0/operations/1"
+ },
+ {
+  "op": "replace",
+  "path": "/spec/rules/0/operations/0",
+  "value": "UPDATE"
+ }
+]
+
