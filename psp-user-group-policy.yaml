@@ -1,0 +1,28 @@
+apiVersion: policies.kubewarden.io/v1alpha2
+kind: ClusterAdmissionPolicy
+metadata:
+  name: psp-user-group
+spec:
+  policyServer: default
+  module: registry://ghcr.io/kubewarden/policies/psp-user-group:v0.1.1
+  rules:
+  - apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
+    operations:
+    - CREATE
+    - UPDATE
+  mutating: true
+  settings:
+    run_as_user: 
+      rule: "MustRunAs"
+      ranges:
+        - min: 1000
+          max: 2000
+        - min: 3000
+          max: 4000
+    run_as_group: 
+      rule: "RunAsAny"
+    supplemental_groups: 
+      rule: "RunAsAny"
+
