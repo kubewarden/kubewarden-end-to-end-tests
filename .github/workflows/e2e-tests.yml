@@ -27,7 +27,7 @@ on:
         description: "Define the policy server container image tag"
         type: string
         required: false
-        default: "v0.2.5"
+        default: "latest"
       policy-server-container-image-artifact:
         description: "Define the artifact containing the policy server container image"
         type: string
