@@ -62,7 +62,7 @@ jobs:
           path: "e2e-tests"
       -
         name: "Create Kubernetes cluster with Kubewarden installed"
-        uses: kubewarden/install-kubewarden-action@v1
+        uses: kubewarden/setup-kubewarden-cluster-action@v1
         with:
           controller-image-repository: ${{ inputs.controller-image-repository }}
           controller-image-tag: ${{ inputs.controller-image-tag }}
