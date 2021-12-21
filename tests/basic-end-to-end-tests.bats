@@ -1,81 +1,70 @@
 #!/usr/bin/env bats
 
+source $BATS_TEST_DIRNAME/common.bash
+
 setup_file() {
-	kubectl delete --wait --ignore-not-found pods --all
-	kubectl delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
-	kubectl wait --for=condition=Ready -n kubewarden pod --all
+	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found pods --all
+	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
+	kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready -n kubewarden pod --all
 }
 
-@test "Install ClusterAdimissionPolicy" {
-	run kubectl apply -f $RESOURCES_DIR/privileged-pod-policy.yaml
-	run kubectl wait --for=condition=PolicyActive clusteradmissionpolicies --all
+@test "[Basic end-to-end tests] Install ClusterAdimissionPolicy" {
+	apply_cluster_admission_policy $RESOURCES_DIR/privileged-pod-policy.yaml
+}
+
+@test "[Basic end-to-end tests] Launch a privileged pod should fail" {
+	kubectl_apply_should_fail $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+}
+
+@test  "[Basic end-to-end tests] Launch a pod which does not violate privileged pod policy" {
+	kubectl_apply_should_succeed $RESOURCES_DIR/not-violate-privileged-pod-policy.yaml
+}
+
+@test  "[Basic end-to-end tests] Update privileged pod policy to check only UPDATE operations" {
+        run kubectl --context $CLUSTER_CONTEXT patch clusteradmissionpolicy privileged-pods --type=json --patch-file $RESOURCES_DIR/privileged-pod-policy-patch.json
 	[ "$status" -eq 0 ]
 }
 
-@test "Launch a privileged pod should fail" {
-	run kubectl apply -f $RESOURCES_DIR/violate-privileged-pod-policy.yaml
-	[ "$status" -ne 0 ]
+@test "[Basic end-to-end tests] Launch a pod which violate privileged pod policy after policy change should work" {
+	kubectl_apply_should_succeed $RESOURCES_DIR/violate-privileged-pod-policy.yaml
 }
 
-@test  "Launch a pod which does not violate privileged pod policy" {
-        run kubectl apply -f $RESOURCES_DIR/not-violate-privileged-pod-policy.yaml
+@test "[Basic end-to-end tests] Delete ClusterAdmissionPolicy" {
+	kubectl_delete $RESOURCES_DIR/privileged-pod-policy.yaml
+}
+
+@test "[Basic end-to-end tests] Launch a pod which violate privileged pod policy after policy deletion should work" {
+	kubectl_apply_should_succeed $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+}
+
+@test "[Basic end-to-end tests] Install psp-user-group ClusterAdmissionPolicy" {
+	apply_cluster_admission_policy $RESOURCES_DIR/psp-user-group-policy.yaml
+}
+
+@test "[Basic end-to-end tests] Launch a pod that should be mutate by psp-user-group-policy" {
+	kubectl_apply_should_succeed $RESOURCES_DIR/mutate-pod-psp-user-group-policy.yaml
+	run kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready pod pause-user-group
+	run eval `kubectl --context $CLUSTER_CONTEXT get pod pause-user-group -o json | jq ".spec.containers[].securityContext.runAsUser==1000"`
 	[ "$status" -eq 0 ]
 }
 
-@test  "Update privileged pod policy to check only UPDATE operations" {
-        run kubectl patch clusteradmissionpolicy privileged-pods --type=json --patch-file $RESOURCES_DIR/privileged-pod-policy-patch.json
+@test "[Basic end-to-end tests] Launch second policy server" {
+	kubectl_apply_should_succeed $RESOURCES_DIR/policy-server.yaml
+}
+
+@test "[Basic end-to-end tests] Update PolicyServer" {
+	run kubectl --context $CLUSTER_CONTEXT patch policyserver default --type=merge -p '{"spec": {"replicas": 2}}'
 	[ "$status" -eq 0 ]
 }
 
-@test "Launch a pod which violate privileged pod policy after policy change should work" {
-	run kubectl apply -f $RESOURCES_DIR/violate-privileged-pod-policy.yaml
-	[ "$status" -eq 0 ]
+@test "[Basic end-to-end tests] All PolicyServer pods should be ready" {
+	wait_for_all_pods_to_be_ready
 }
 
-@test "Delete ClusterAdmissionPolicy" {
-	run kubectl delete --wait --timeout=2m -f $RESOURCES_DIR/privileged-pod-policy.yaml
-	[ "$status" -eq 0 ]
+@test "[Basic end-to-end tests] Delete policy server" {
+	kubectl_delete $RESOURCES_DIR/policy-server.yaml
 }
 
-@test "Launch a pod which violate privileged pod policy after policy deletion should work" {
-	run kubectl apply -f $RESOURCES_DIR/violate-privileged-pod-policy.yaml
-	[ "$status" -eq 0 ]
-}
-
-@test "Install psp-user-group ClusterAdmissionPolicy" {
-	run kubectl apply -f $RESOURCES_DIR/psp-user-group-policy.yaml
-	run kubectl wait --timeout=2m --for=condition=PolicyActive clusteradmissionpolicies --all
-	[ "$status" -eq 0 ]
-}
-
-@test "Launch a pod that should be mutate by psp-user-group-policy" {
-	run kubectl apply -f $RESOURCES_DIR/mutate-pod-psp-user-group-policy.yaml
-	run kubectl wait --for=condition=Ready pod pause-user-group
-	run eval `kubectl get pod pause-user-group -o json | jq ".spec.containers[].securityContext.runAsUser==1000"`
-	[ "$status" -eq 0 ]
-}
-
-@test "Launch second policy server" {
-	run kubectl apply -f $RESOURCES_DIR/policy-server.yaml
-	[ "$status" -eq 0 ]
-}
-
-@test "Update PolicyServer" {
-	run kubectl patch policyserver default --type=merge -p '{"spec": {"replicas": 2}}'
-	[ "$status" -eq 0 ]
-}
-
-@test "All PolicyServer pods should be ready" {
-	run kubectl wait --for=condition=Ready -n kubewarden pod --all
-	[ "$status" -eq 0 ]
-}
-
-@test "Delete policy server" {
-	run kubectl delete --wait --timeout=5m -f $RESOURCES_DIR/policy-server.yaml
-	[ "$status" -eq 0 ]
-}
-
-@test "All PolicyServer pods should be ready after the delete operation" {
-	run kubectl wait --for=condition=Ready -n kubewarden pod --all
-	[ "$status" -eq 0 ]
+@test "[Basic end-to-end tests] All PolicyServer pods should be ready after the delete operation" {
+	wait_for_all_pods_to_be_ready
 }
