@@ -1,0 +1,3 @@
+# Values changes during the reconfiguration tests
+podAnnotations:
+  upgrade_annotations: upgraded
