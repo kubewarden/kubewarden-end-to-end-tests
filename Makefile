@@ -85,3 +85,8 @@ reconfiguration-test: delete-kubewarden install-kubewarden
 .PHONY: basic-e2e-test
 basic-e2e-test: delete-kubewarden install-kubewarden
 	$(call bats, $(TESTS_DIR)/basic-end-to-end-tests.bats)
+
+.PHONY: mutating-requests-test
+mutating-requests-test: delete-kubewarden install-kubewarden
+	$(call bats, $(TESTS_DIR)/mutating-requests-tests.bats)
+

@@ -5,6 +5,16 @@ function kubectl_apply_should_fail {
 	[ "$status" -ne 0 ]
 }
 
+function kubectl_apply_should_fail_with_message {
+	kubectl_apply_should_fail $1
+	if [[ $output != *"$2"* ]]; then
+		echo "Missing string in the output:"
+		echo "Output: $output"
+		echo "Missing string: $2"
+		fail
+	fi
+}
+
 function kubectl_apply_should_succeed {
 	run kubectl --context $CLUSTER_CONTEXT apply --wait --timeout $TIMEOUT  -f $1
 	[ "$status" -eq 0 ]
