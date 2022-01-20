@@ -8,7 +8,7 @@ setup_file() {
 	kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready -n kubewarden pod --all
 }
 
-@test "[Basic end-to-end tests] Install ClusterAdimissionPolicy" {
+@test "[Basic end-to-end tests] Install ClusterAdmissionPolicy" {
 	apply_cluster_admission_policy $RESOURCES_DIR/privileged-pod-policy.yaml
 }
 
