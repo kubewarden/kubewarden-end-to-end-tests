@@ -41,17 +41,24 @@ overwrite the `KUBEWARDEN_CONTROLLER_CHART_VERSION` variable:
 KUBEWARDEN_CONTROLLER_CHART_VERSION=0.3.2 make install-kubewarden
 ```
 
-Once you have a cluster with Kubewarden install, you can run all tests:
+Once you have a cluster with Kubewarden install, you can run the basic
+e2e tests:
 
 ```console
-make runall
+make basic-e2e-test
+```
+
+You can also run the reconfiguration tests:
+
+```console
+make reconfiguration-test
 ```
 
 All the tests run on a given `kubectl` context. Thus, if you want to run the
 tests on a cluster already in place, you need to define the context:
 
 ```console
-CLUSTER_CONTEXT=k3d-mycluster make runall
+CLUSTER_CONTEXT=k3d-mycluster make basic-e2e-test
 ```
 
 Also check the Kubewarden controller repository to see how run this test in a [Github

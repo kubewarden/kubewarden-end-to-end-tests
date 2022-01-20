@@ -31,7 +31,7 @@ bats = RESOURCES_DIR=$(RESOURCES_DIR) \
 		--print-output-on-failure \
 		$(1)
 
-install-k3d: 
+install-k3d:
 	curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | TAG=$(K3D_VERSION) bash
 
 install-kubewarden-chart-repo:
