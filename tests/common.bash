@@ -36,6 +36,6 @@ function wait_for_all_cluster_admission_policies_to_be_active {
 }
 
 function wait_for_all_pods_to_be_ready {
-	run kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready -n kubewarden pod --all
+	run kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready --timeout $TIMEOUT -n kubewarden pod --all
 	[ "$status" -eq 0 ]
 }
