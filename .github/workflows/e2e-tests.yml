@@ -37,7 +37,7 @@ on:
 jobs:
   kubewarden-e2e-tests:
     name: "Kubewarden basic end-to-end tests"
-    runs-on: [self-hosted, linux]
+    runs-on: [self-hosted]
     steps:
       - name: "Checkout end-to-end repository"
         uses: actions/checkout@v2
