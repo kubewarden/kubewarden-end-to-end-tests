@@ -63,6 +63,8 @@ jobs:
         run: |
           make --directory e2e-tests basic-e2e-test
         shell: bash
+        env:
+          CLUSTER_CONTEXT: k3d-kubewarden-test-cluster #TODO get context from setup-kubewarden-cluster-action
       - name: "Uninstall Kuberwarden"
         run: |
           # TODO - share release with the create-kubewarden-cluster action
