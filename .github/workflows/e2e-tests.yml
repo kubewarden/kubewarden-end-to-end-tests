@@ -50,7 +50,7 @@ jobs:
         run: |
           cd e2e-tests
           TAG=$(git describe --tag `git rev-list --tags --max-count=1`)
-          git checkout -b $TAG $TAG
+          git checkout -B $TAG $TAG
       - name: "Setup bats testing framework"
         uses: mig4/setup-bats@v1.2.0
         with:
