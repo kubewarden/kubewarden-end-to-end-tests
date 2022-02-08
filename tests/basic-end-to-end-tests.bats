@@ -21,7 +21,7 @@ setup_file() {
 }
 
 @test  "[Basic end-to-end tests] Update privileged pod policy to check only UPDATE operations" {
-        run kubectl --context $CLUSTER_CONTEXT patch clusteradmissionpolicy privileged-pods --type=json --patch-file $RESOURCES_DIR/privileged-pod-policy-patch.json
+        run kubectl --context $CLUSTER_CONTEXT patch clusteradmissionpolicy privileged-pods --type=json -p ' [{ "op": "remove", "path": "/spec/rules/0/operations/1" }, { "op": "replace", "path": "/spec/rules/0/operations/0", "value": "UPDATE" } ]'
 	[ "$status" -eq 0 ]
 }
 
