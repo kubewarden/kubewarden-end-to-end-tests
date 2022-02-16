@@ -39,3 +39,19 @@ function wait_for_all_pods_to_be_ready {
 	run kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready --timeout $TIMEOUT -n kubewarden pod --all
 	[ "$status" -eq 0 ]
 }
+
+function wait_for_default_policy_server_rollout {
+	wait_for_policy_server_rollout default
+}
+
+function wait_for_policy_server_rollout {
+	run kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE rollout status "deployment/policy-server-$1"
+}
+
+function default_policy_server_should_have_log_line {
+	policy_server_should_have_log_line default "$1"
+}
+
+function policy_server_should_have_log_line {
+	run kubectl --context $CLUSTER_CONTEXT logs -n $NAMESPACE -lapp="kubewarden-policy-server-$1" | grep "$2"
+}

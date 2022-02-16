@@ -77,7 +77,6 @@ delete-kubewarden:
 		--kube-context $(CLUSTER_CONTEXT) \
 		delete $(KUBEWARDEN_CRDS_CHART_RELEASE)
 
-
 .PHONY: reconfiguration-test
 reconfiguration-test:
 	$(call bats, $(TESTS_DIR)/reconfiguration-tests.bats)
@@ -90,3 +89,6 @@ basic-e2e-test:
 mutating-requests-test:
 	$(call bats, $(TESTS_DIR)/mutating-requests-tests.bats)
 
+.PHONY: monitor-mode-test
+monitor-mode-test:
+	$(call bats, $(TESTS_DIR)/monitor-mode-tests.bats)
