@@ -4,6 +4,7 @@ source $BATS_TEST_DIRNAME/common.bash
 
 setup_file() {
 	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found pods --all
+	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
 	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found -n kubewarden admissionpolicies --all
 	kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready -n kubewarden pod --all
 }

@@ -4,7 +4,7 @@ source $BATS_TEST_DIRNAME/common.bash
 
 setup_file() {
 	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found pods --all
-	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
+	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found clusteradmissionpolicies --all
 	kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready -n kubewarden pod --all
 }
 
@@ -22,6 +22,10 @@ setup_file() {
 
 @test "[Monitor mode end-to-end tests] Transition policy mode from monitor to protect should succeed" {
 	apply_cluster_admission_policy $RESOURCES_DIR/privileged-pod-policy.yaml
+}
+
+@test "[Monitor mode end-to-end tests] Launch a privileged pod should fail" {
+	kubectl_apply_should_fail_with_message $RESOURCES_DIR/violate-privileged-pod-policy.yaml "cannot schedule privileged containers"
 }
 
 @test "[Monitor mode end-to-end tests] Transition policy mode from protect to monitor should be disallowed" {

@@ -23,11 +23,15 @@ function kubectl_apply_should_succeed {
 function apply_cluster_admission_policy {
 	kubectl_apply_should_succeed $1
 	wait_for_all_cluster_admission_policies_to_be_active
+	wait_for_default_policy_server_rollout
+	wait_for_all_cluster_admission_policy_condition PolicyUniquelyReachable
 }
 
 function apply_admission_policy {
 	kubectl_apply_should_succeed $1
 	wait_for_all_admission_policies_to_be_active
+	wait_for_default_policy_server_rollout
+	wait_for_all_admission_policy_condition PolicyUniquelyReachable
 }
 
 function kubectl_delete {
@@ -36,16 +40,26 @@ function kubectl_delete {
 }
 
 function wait_for_all_cluster_admission_policies_to_be_active {
-	run kubectl --context $CLUSTER_CONTEXT wait --timeout $TIMEOUT --for=condition=PolicyActive clusteradmissionpolicies --all
+	wait_for_all_cluster_admission_policy_condition PolicyActive
+}
+
+function wait_for_all_cluster_admission_policy_condition {
+	run kubectl --context $CLUSTER_CONTEXT wait --timeout $TIMEOUT --for=condition="$1" clusteradmissionpolicies --all
 	[ "$status" -eq 0 ]
 }
 
 function wait_for_all_admission_policies_to_be_active {
-	run kubectl --context $CLUSTER_CONTEXT wait --timeout $TIMEOUT --for=condition=PolicyActive admissionpolicies --all
+	run kubectl --context $CLUSTER_CONTEXT wait --timeout $TIMEOUT --for=condition=PolicyActive admissionpolicies -A --all
+	[ "$status" -eq 0 ]
+}
+
+function wait_for_all_admission_policy_condition {
+	run kubectl --context $CLUSTER_CONTEXT wait --timeout $TIMEOUT --for=condition="$1" admissionpolicies -A --all
 	[ "$status" -eq 0 ]
 }
 
 function wait_for_all_pods_to_be_ready {
+	wait_for_default_policy_server_rollout
 	run kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready --timeout $TIMEOUT -n kubewarden pod --all
 	[ "$status" -eq 0 ]
 }
