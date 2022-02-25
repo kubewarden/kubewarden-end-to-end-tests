@@ -92,3 +92,7 @@ mutating-requests-test:
 .PHONY: monitor-mode-test
 monitor-mode-test:
 	$(call bats, $(TESTS_DIR)/monitor-mode-tests.bats)
+
+.PHONY: namespaced-admission-policy-test
+namespaced-admission-policy-test:
+	$(call bats, $(TESTS_DIR)/namespaced-admission-policy-tests.bats)
