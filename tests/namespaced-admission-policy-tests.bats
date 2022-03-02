@@ -26,7 +26,6 @@ setup_file() {
 
 @test  "[AdmissionPolicy tests] Update privileged pod policy to check only UPDATE operations" {
         run kubectl --context $CLUSTER_CONTEXT patch admissionpolicy privileged-pods --type=json -p ' [{ "op": "remove", "path": "/spec/rules/0/operations/1" }, { "op": "replace", "path": "/spec/rules/0/operations/0", "value": "UPDATE" } ]'
-        run kubectl --context $CLUSTER_CONTEXT wait --timeout $TIMEOUT --for=condition=PolicyActive admissionpolicies --all
 	[ "$status" -eq 0 ]
 }
 
