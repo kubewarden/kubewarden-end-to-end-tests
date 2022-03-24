@@ -9,12 +9,14 @@ K3D_VERSION ?= v5.0.0
 
 KUBEWARDEN_HELM_REPO_NAME ?= kubewarden
 KUBEWARDEN_CONTROLLER_CHART_RELEASE ?= kubewarden-controller
-KUBEWARDEN_CONTROLLER_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/kubewarden-controller --versions -o json | jq ".[0].version" | sed "s/\"//g")
-KUBEWARDEN_CRDS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/kubewarden-crds --versions -o json | jq ".[0].version" | sed "s/\"//g")
+KUBEWARDEN_CONTROLLER_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) --versions -o json | jq ".[0].version" | sed "s/\"//g")
+KUBEWARDEN_CRDS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE) --versions -o json | jq ".[0].version" | sed "s/\"//g")
 KUBEWARDEN_CRDS_CHART_RELEASE ?= kubewarden-crds
+KUBEWARDEN_DEFAULTS_CHART_RELEASE ?= kubewarden-defaults
+KUBEWARDEN_DEFAULTS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json | jq ".[0].version" | sed "s/\"//g")
 CERT_MANAGER_VERSION ?= v1.5.3
 
-CLUSTER_NAME ?= $(shell echo kubewarden-tests-$(KUBEWARDEN_CONTROLLER_CHART_VERSION) | sed 's/\./-/g')
+CLUSTER_NAME ?= kubewarden-testing #$(shell echo kubewarden-tests-$(KUBEWARDEN_CONTROLLER_CHART_VERSION) | sed 's/\./-/g')
 CLUSTER_CONTEXT ?= k3d-$(CLUSTER_NAME)
 
 kube = kubectl --context $(CLUSTER_CONTEXT) $(1)
@@ -60,12 +62,16 @@ install-kubewarden: install-cert-manager install-kubewarden-chart-repo
 		--kube-context $(CLUSTER_CONTEXT) \
 		--namespace $(NAMESPACE) --create-namespace \
 		--version $(KUBEWARDEN_CRDS_CHART_VERSION) \
-		$(KUBEWARDEN_CRDS_CHART_RELEASE) $(KUBEWARDEN_HELM_REPO_NAME)/kubewarden-crds
+		$(KUBEWARDEN_CRDS_CHART_RELEASE) $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE)
 	helm upgrade --install --wait --namespace $(NAMESPACE) \
 		--kube-context $(CLUSTER_CONTEXT) \
 		--values $(RESOURCES_DIR)/default-kubewarden-controller-values.yaml \
 		--version $(KUBEWARDEN_CONTROLLER_CHART_VERSION) \
-		$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) $(KUBEWARDEN_HELM_REPO_NAME)/kubewarden-controller
+		$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE)
+	helm upgrade --install --wait --namespace $(NAMESPACE) \
+		--kube-context $(CLUSTER_CONTEXT) \
+		--version $(KUBEWARDEN_DEFAULTS_CHART_VERSION) \
+		$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE)
 	$(call kube, wait --for=condition=Ready --namespace $(NAMESPACE) pods --all)
 
 .PHONY: delete-kubewarden
@@ -96,3 +102,7 @@ monitor-mode-test:
 .PHONY: namespaced-admission-policy-test
 namespaced-admission-policy-test:
 	$(call bats, $(TESTS_DIR)/namespaced-admission-policy-tests.bats)
+
+.PHONY: secure-supply-chain-test
+secure-supply-chain-test:
+	$(call bats, $(TESTS_DIR)/secure-supply-chain-tests.bats)
