@@ -1,5 +1,12 @@
 #!/bin/bash
 
+function clean_up_environment {
+	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found pods --all
+	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
+	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found -n kubewarden admissionpolicies --all
+	kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready -n kubewarden pod --all
+}
+
 function kubectl_apply_should_fail {
 	run kubectl --context $CLUSTER_CONTEXT apply --wait --timeout $TIMEOUT  -f $1
 	[ "$status" -ne 0 ]
@@ -39,6 +46,15 @@ function kubectl_delete {
 	[ "$status" -eq 0 ]
 }
 
+function kubectl_delete_by_type_and_name {
+	run kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE delete --wait --timeout $TIMEOUT  --ignore-not-found $1 $2
+	[ "$status" -eq 0 ]
+}
+
+function kubectl_delete_configmap_by_name {
+	kubectl_delete_by_type_and_name configmap $1
+}
+
 function wait_for_all_cluster_admission_policies_to_be_active {
 	wait_for_all_cluster_admission_policy_condition PolicyActive
 }
@@ -68,8 +84,15 @@ function wait_for_default_policy_server_rollout {
 	wait_for_policy_server_rollout default
 }
 
+function default_policy_server_rollout_should_fail {
+	revision=$(kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE get "deployment/policy-server-default" -o json | jq ".metadata.annotations.\"deployment.kubernetes.io/revision\"" | sed "s/\"//g")
+	run kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE rollout status --revision $revision --timeout $TIMEOUT "deployment/policy-server-default"
+	[ "$status" -ne 0 ]
+}
+
 function wait_for_policy_server_rollout {
-	run kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE rollout status "deployment/policy-server-$1"
+	revision=$(kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE get "deployment/policy-server-$1" -o json | jq ".metadata.annotations.\"deployment.kubernetes.io/revision\"" | sed "s/\"//g")
+	run kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE rollout status --revision $revision "deployment/policy-server-$1"
 }
 
 function default_policy_server_should_have_log_line {
@@ -79,3 +102,18 @@ function default_policy_server_should_have_log_line {
 function policy_server_should_have_log_line {
 	run kubectl --context $CLUSTER_CONTEXT logs -n $NAMESPACE -lapp="kubewarden-policy-server-$1" | grep "$2"
 }
+
+function create_configmap_from_file_with_root_key {
+	run kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE create configmap $1 --from-file=$2=$3
+}
+
+function kubewarden_crds_should_not_be_installed {
+	run kubectl --context $CLUSTER_CONTEXT get crds policyservers.policies.kubewarden.io clusteradmissionpolicies.policies.kubewarden.io admissionpolicies.policies.kubewarden.io
+}
+
+
+function install_kubewarden_stack {
+	run helm install --kube-context $CLUSTER_CONTEXT --wait -n kubewarden --create-namespace kubewarden-crds kubewarden/kubewarden-crds
+	run helm install --kube-context $CLUSTER_CONTEXT --wait -n kubewarden kubewarden-controller kubewarden/kubewarden-controller
+	run helm install --kube-context $CLUSTER_CONTEXT --wait -n kubewarden kubewarden-defaults kubewarden/kubewarden-defaults
+} 
