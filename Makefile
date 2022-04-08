@@ -10,6 +10,11 @@ K3D_VERSION ?= v5.0.0
 KUBEWARDEN_HELM_REPO_NAME ?= kubewarden
 KUBEWARDEN_CONTROLLER_CHART_RELEASE ?= kubewarden-controller
 KUBEWARDEN_CONTROLLER_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) --versions -o json | jq ".[0].version" | sed "s/\"//g")
+# The KUBEWARDEN_CHARTS_LOCATION variable define where charts live. By default, the Helm
+# chart repository is used. However, if you want to test a local Helm chart 
+# version, you can overwrite this variable with the parent directory of the chart.
+# But the chart name must be equal of the names in the Helm chart repository.
+KUBEWARDEN_CHARTS_LOCATION ?= kubewarden 
 KUBEWARDEN_CRDS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE) --versions -o json | jq ".[0].version" | sed "s/\"//g")
 KUBEWARDEN_CRDS_CHART_RELEASE ?= kubewarden-crds
 KUBEWARDEN_DEFAULTS_CHART_RELEASE ?= kubewarden-defaults
@@ -61,21 +66,21 @@ install-kubewarden: install-cert-manager install-kubewarden-chart-repo
 	helm upgrade --install --wait \
 		--kube-context $(CLUSTER_CONTEXT) \
 		--namespace $(NAMESPACE) --create-namespace \
-		--version $(KUBEWARDEN_CRDS_CHART_VERSION) \
-		$(KUBEWARDEN_CRDS_CHART_RELEASE) $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE)
+		$(KUBEWARDEN_CRDS_CHART_RELEASE) $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-crds/
 	helm upgrade --install --wait --namespace $(NAMESPACE) \
 		--kube-context $(CLUSTER_CONTEXT) \
 		--values $(RESOURCES_DIR)/default-kubewarden-controller-values.yaml \
-		--version $(KUBEWARDEN_CONTROLLER_CHART_VERSION) \
-		$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE)
+		$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-controller/
 	helm upgrade --install --wait --namespace $(NAMESPACE) \
 		--kube-context $(CLUSTER_CONTEXT) \
-		--version $(KUBEWARDEN_DEFAULTS_CHART_VERSION) \
-		$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE)
+		$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-defaults/
 	$(call kube, wait --for=condition=Ready --namespace $(NAMESPACE) pods --all)
 
 .PHONY: delete-kubewarden
 delete-kubewarden:
+	- helm --namespace $(NAMESPACE) \
+		--kube-context $(CLUSTER_CONTEXT) \
+		delete $(KUBEWARDEN_DEFAULTS_CHART_RELEASE)
 	- helm --namespace $(NAMESPACE) \
 		--kube-context $(CLUSTER_CONTEXT) \
 		delete $(KUBEWARDEN_CONTROLLER_CHART_RELEASE)
