@@ -5,6 +5,13 @@ metadata:
 spec:
   policyServer: default
   module: registry://ghcr.io/kubewarden/policies/psp-user-group:v0.1.1
+  namespaceSelector:
+    matchExpressions:
+      - key: "kubernetes.io/metadata.name"
+        operator: NotIn
+        values:
+          - kubewarden
+          - kube-system
   rules:
   - apiGroups: [""]
     apiVersions: ["v1"]
@@ -14,15 +21,15 @@ spec:
     - UPDATE
   mutating: true
   settings:
-    run_as_user: 
+    run_as_user:
       rule: "MustRunAs"
       ranges:
         - min: 1000
           max: 2000
         - min: 3000
           max: 4000
-    run_as_group: 
+    run_as_group:
       rule: "RunAsAny"
-    supplemental_groups: 
+    supplemental_groups:
       rule: "RunAsAny"
 

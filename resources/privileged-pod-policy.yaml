@@ -5,6 +5,13 @@ metadata:
 spec:
   policyServer: default
   module: registry://ghcr.io/kubewarden/policies/pod-privileged:v0.1.10
+  namespaceSelector:
+    matchExpressions:
+      - key: "kubernetes.io/metadata.name"
+        operator: NotIn
+        values:
+          - kubewarden
+          - kube-system
   rules:
   - apiGroups: [""]
     apiVersions: ["v1"]
