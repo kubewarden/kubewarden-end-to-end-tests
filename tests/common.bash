@@ -76,7 +76,7 @@ function wait_for_all_admission_policy_condition {
 
 function wait_for_all_pods_to_be_ready {
 	wait_for_default_policy_server_rollout
-	run kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready --timeout $TIMEOUT -n kubewarden pod --all
+	run kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready --timeout $TIMEOUT -n $NAMESPACE pod --all
 	[ "$status" -eq 0 ]
 }
 
