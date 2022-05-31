@@ -88,6 +88,15 @@ delete-kubewarden:
 		--kube-context $(CLUSTER_CONTEXT) \
 		delete $(KUBEWARDEN_CRDS_CHART_RELEASE)
 
+.PHONY: delete-opentelemetry
+delete-opentelemetry: 
+	$(call kube, delete -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/opentelemetry-operator.yaml)
+
+.PHONY: install-opentelemetry
+install-opentelemetry: install-cert-manager
+	$(call kube, apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/opentelemetry-operator.yaml)
+	$(call kube, wait --for=condition=Available deployment --timeout=$(TIMEOUT) -n opentelemetry-operator-system --all)
+
 .PHONY: reconfiguration-test
 reconfiguration-test:
 	$(call bats, $(TESTS_DIR)/reconfiguration-tests.bats)
