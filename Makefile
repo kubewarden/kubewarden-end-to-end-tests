@@ -73,6 +73,7 @@ install-kubewarden: install-cert-manager install-kubewarden-chart-repo
 		$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-controller
 	helm upgrade --install --wait --namespace $(NAMESPACE) \
 		--kube-context $(CLUSTER_CONTEXT) \
+		--values $(RESOURCES_DIR)/default-kubewarden-defaults-values.yaml \
 		$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-defaults
 	$(call kube, wait --for=condition=Ready --namespace $(NAMESPACE) pods --all)
 
