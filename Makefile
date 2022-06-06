@@ -1,7 +1,15 @@
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 mkfile_dir := $(dir $(mkfile_path))
 TESTS_DIR ?= $(mkfile_dir)tests
-RESOURCES_DIR ?= $(mkfile_dir)resources
+# directory with all the "template" files used to generated the files used during
+# the tests.
+ROOT_RESOURCES_DIR ?= $(mkfile_dir)resources
+# directory with all the files used during the tests. This files are copied from
+# $(ROOT_RESOURCES_DIR) and changed to used the CRDs version defined in $(CRD_VERSION)
+RESOURCES_DIR ?= $(ROOT_RESOURCES_DIR)/resources_$(CRD_VERSION)
+# CRD version to be tested
+CRD_VERSION ?= v1alpha2
+# timeout for the kubectl commands
 TIMEOUT ?= 5m
 CONTROLLER_CHART ?= kubewarden/kubewarden-controller
 NAMESPACE ?= kubewarden
@@ -44,6 +52,10 @@ install-k3d:
 install-kubewarden-chart-repo:
 	helm repo add --force-update $(KUBEWARDEN_HELM_REPO_NAME) https://charts.kubewarden.io
 
+.PHONY: generate-versioned-resources-dir
+generate-versioned-resources-dir:
+	./scripts/generate_resources_dir.sh $(ROOT_RESOURCES_DIR) $(CRD_VERSION)
+
 .PHONY: setup
 setup: install-k3d install-kubewarden-chart-repo
 
@@ -58,7 +70,7 @@ delete-k8s-cluster:
 
 .PHONY: create-k8s-cluster
 create-k8s-cluster: delete-k8s-cluster
-	k3d cluster create $(CLUSTER_NAME) --wait --timeout $(TIMEOUT) --config $(RESOURCES_DIR)/k3d-default.yaml -v /dev/mapper:/dev/mapper
+	k3d cluster create $(CLUSTER_NAME) --wait --timeout $(TIMEOUT) --config $(ROOT_RESOURCES_DIR)/k3d-default.yaml -v /dev/mapper:/dev/mapper
 	$(call kube,  wait --for=condition=Ready nodes --all)
 
 .PHONY: install-kubewarden
@@ -69,11 +81,11 @@ install-kubewarden: install-cert-manager install-kubewarden-chart-repo
 		$(KUBEWARDEN_CRDS_CHART_RELEASE) $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-crds
 	helm upgrade --install --wait --namespace $(NAMESPACE) \
 		--kube-context $(CLUSTER_CONTEXT) \
-		--values $(RESOURCES_DIR)/default-kubewarden-controller-values.yaml \
+		--values $(ROOT_RESOURCES_DIR)/default-kubewarden-controller-values.yaml \
 		$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-controller
 	helm upgrade --install --wait --namespace $(NAMESPACE) \
 		--kube-context $(CLUSTER_CONTEXT) \
-		--values $(RESOURCES_DIR)/default-kubewarden-defaults-values.yaml \
+		--values $(ROOT_RESOURCES_DIR)/default-kubewarden-defaults-values.yaml \
 		$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-defaults
 	$(call kube, wait --for=condition=Ready --namespace $(NAMESPACE) pods --all)
 
@@ -99,25 +111,26 @@ install-opentelemetry: install-cert-manager
 	$(call kube, wait --for=condition=Available deployment --timeout=$(TIMEOUT) -n opentelemetry-operator-system --all)
 
 .PHONY: reconfiguration-test
-reconfiguration-test:
+reconfiguration-test: generate-versioned-resources-dir
 	$(call bats, $(TESTS_DIR)/reconfiguration-tests.bats)
 
 .PHONY: basic-e2e-test
-basic-e2e-test:
+basic-e2e-test: generate-versioned-resources-dir
 	$(call bats, $(TESTS_DIR)/basic-end-to-end-tests.bats)
 
 .PHONY: mutating-requests-test
-mutating-requests-test:
+mutating-requests-test: generate-versioned-resources-dir
 	$(call bats, $(TESTS_DIR)/mutating-requests-tests.bats)
 
 .PHONY: monitor-mode-test
-monitor-mode-test:
+monitor-mode-test: generate-versioned-resources-dir
 	$(call bats, $(TESTS_DIR)/monitor-mode-tests.bats)
 
 .PHONY: namespaced-admission-policy-test
-namespaced-admission-policy-test:
+namespaced-admission-policy-test: generate-versioned-resources-dir
 	$(call bats, $(TESTS_DIR)/namespaced-admission-policy-tests.bats)
 
 .PHONY: secure-supply-chain-test
-secure-supply-chain-test:
+secure-supply-chain-test: generate-versioned-resources-dir
 	$(call bats, $(TESTS_DIR)/secure-supply-chain-tests.bats)
+
