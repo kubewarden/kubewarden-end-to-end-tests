@@ -14,19 +14,25 @@ TIMEOUT ?= 5m
 CONTROLLER_CHART ?= kubewarden/kubewarden-controller
 NAMESPACE ?= kubewarden
 K3D_VERSION ?= v5.0.0
-
+# helm repo name used to download the Helm charts.
 KUBEWARDEN_HELM_REPO_NAME ?= kubewarden
-KUBEWARDEN_CONTROLLER_CHART_RELEASE ?= kubewarden-controller
-KUBEWARDEN_CONTROLLER_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) --versions -o json | jq ".[0].version" | sed "s/\"//g")
+# URL where the Helm charts are stored
+KUBEWARDEN_HELM_REPO_URL ?= https://charts.kubewarden.io
 # The KUBEWARDEN_CHARTS_LOCATION variable define where charts live. By default, the Helm
-# chart repository is used. However, if you want to test a local Helm chart 
+# chart repository is used. However, if you want to test a local Helm chart
 # version, you can overwrite this variable with the parent directory of the chart.
 # But the chart name must be equal of the names in the Helm chart repository.
 KUBEWARDEN_CHARTS_LOCATION ?= kubewarden
+
+KUBEWARDEN_CONTROLLER_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) --versions -o json | jq ".[0].version" | sed "s/\"//g")
+KUBEWARDEN_CONTROLLER_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) --versions -o json | jq ".[1].version" | sed "s/\"//g")
+KUBEWARDEN_CONTROLLER_CHART_RELEASE ?= kubewarden-controller
 KUBEWARDEN_CRDS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE) --versions -o json | jq ".[0].version" | sed "s/\"//g")
+KUBEWARDEN_CRDS_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE) --versions -o json | jq ".[1].version" | sed "s/\"//g")
 KUBEWARDEN_CRDS_CHART_RELEASE ?= kubewarden-crds
-KUBEWARDEN_DEFAULTS_CHART_RELEASE ?= kubewarden-defaults
 KUBEWARDEN_DEFAULTS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json | jq ".[0].version" | sed "s/\"//g")
+KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json | jq ".[1].version" | sed "s/\"//g")
+KUBEWARDEN_DEFAULTS_CHART_RELEASE ?= kubewarden-defaults
 CERT_MANAGER_VERSION ?= v1.5.3
 
 CLUSTER_NAME ?= kubewarden-testing #$(shell echo kubewarden-tests-$(KUBEWARDEN_CONTROLLER_CHART_VERSION) | sed 's/\./-/g')
@@ -35,8 +41,14 @@ CLUSTER_CONTEXT ?= k3d-$(CLUSTER_NAME)
 kube = kubectl --context $(CLUSTER_CONTEXT) $(1)
 bats = RESOURCES_DIR=$(RESOURCES_DIR) \
 	TIMEOUT=$(TIMEOUT) \
+	KUBEWARDEN_CRDS_CHART_OLD_VERSION=$(KUBEWARDEN_CRDS_CHART_OLD_VERSION) \
+	KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION=$(KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION) \
+	KUBEWARDEN_CONTROLLER_CHART_OLD_VERSION=$(KUBEWARDEN_CONTROLLER_CHART_OLD_VERSION) \
+	KUBEWARDEN_CRDS_CHART_VERSION=$(KUBEWARDEN_CRDS_CHART_VERSION) \
+	KUBEWARDEN_DEFAULTS_CHART_VERSION=$(KUBEWARDEN_DEFAULTS_CHART_VERSION) \
 	KUBEWARDEN_CONTROLLER_CHART_VERSION=$(KUBEWARDEN_CONTROLLER_CHART_VERSION) \
 	KUBEWARDEN_CONTROLLER_CHART_RELEASE=$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) \
+	KUBEWARDEN_CHARTS_LOCATION=$(KUBEWARDEN_CHARTS_LOCATION) \
 	CONTROLLER_CHART=$(CONTROLLER_CHART) \
 	CLUSTER_CONTEXT=$(CLUSTER_CONTEXT) \
 	NAMESPACE=$(NAMESPACE) \
@@ -50,7 +62,7 @@ install-k3d:
 	curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | TAG=$(K3D_VERSION) bash
 
 install-kubewarden-chart-repo:
-	helm repo add --force-update $(KUBEWARDEN_HELM_REPO_NAME) https://charts.kubewarden.io
+	helm repo add --force-update $(KUBEWARDEN_HELM_REPO_NAME) $(KUBEWARDEN_HELM_REPO_URL)
 
 .PHONY: generate-versioned-resources-dir
 generate-versioned-resources-dir:
@@ -102,7 +114,7 @@ delete-kubewarden:
 		delete $(KUBEWARDEN_CRDS_CHART_RELEASE)
 
 .PHONY: delete-opentelemetry
-delete-opentelemetry: 
+delete-opentelemetry:
 	$(call kube, delete -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/opentelemetry-operator.yaml)
 
 .PHONY: install-opentelemetry
@@ -134,3 +146,9 @@ namespaced-admission-policy-test: generate-versioned-resources-dir
 secure-supply-chain-test: generate-versioned-resources-dir
 	$(call bats, $(TESTS_DIR)/secure-supply-chain-tests.bats)
 
+.PHONY: upgrade-test
+upgrade-test: create-k8s-cluster install-kubewarden-chart-repo install-cert-manager 
+	rm -rf $(RESOURCES_DIR)
+	mkdir $(RESOURCES_DIR)
+	find $(ROOT_RESOURCES_DIR) -maxdepth 1 -type f  -exec cp \{\}  $(RESOURCES_DIR) \;
+	$(call bats, $(TESTS_DIR)/upgrade.bats)
