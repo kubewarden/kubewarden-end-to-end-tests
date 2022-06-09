@@ -8,7 +8,7 @@ ROOT_RESOURCES_DIR ?= $(mkfile_dir)resources
 # $(ROOT_RESOURCES_DIR) and changed to used the CRDs version defined in $(CRD_VERSION)
 RESOURCES_DIR ?= $(ROOT_RESOURCES_DIR)/resources_$(CRD_VERSION)
 # CRD version to be tested
-CRD_VERSION ?= v1alpha2
+CRD_VERSION ?= v1
 # timeout for the kubectl commands
 TIMEOUT ?= 5m
 CONTROLLER_CHART ?= kubewarden/kubewarden-controller
@@ -58,35 +58,17 @@ bats = RESOURCES_DIR=$(RESOURCES_DIR) \
 		--print-output-on-failure \
 		$(1)
 
-install-k3d:
-	curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | TAG=$(K3D_VERSION) bash
-
-install-kubewarden-chart-repo:
-	helm repo add --force-update $(KUBEWARDEN_HELM_REPO_NAME) $(KUBEWARDEN_HELM_REPO_URL)
-
-.PHONY: generate-versioned-resources-dir
-generate-versioned-resources-dir:
-	./scripts/generate_resources_dir.sh $(ROOT_RESOURCES_DIR) $(CRD_VERSION)
-
-.PHONY: setup
-setup: install-k3d install-kubewarden-chart-repo
-
-.PHONY: install-cert-manager
-install-cert-manager:
-	$(call kube, apply -f https://github.com/jetstack/cert-manager/releases/download/$(CERT_MANAGER_VERSION)/cert-manager.yaml)
-	$(call kube, wait --for=condition=Available deployment --timeout=$(TIMEOUT) -n cert-manager --all)
-
-.PHONY: delete-k8s-cluster
-delete-k8s-cluster:
+define delete-cluster =
 	- k3d cluster delete $(CLUSTER_NAME)
+endef
 
-.PHONY: create-k8s-cluster
-create-k8s-cluster: delete-k8s-cluster
+define create-cluster =
+	$(delete-cluster)
 	k3d cluster create $(CLUSTER_NAME) --wait --timeout $(TIMEOUT) --config $(ROOT_RESOURCES_DIR)/k3d-default.yaml -v /dev/mapper:/dev/mapper
 	$(call kube,  wait --for=condition=Ready nodes --all)
+endef
 
-.PHONY: install-kubewarden
-install-kubewarden: install-cert-manager install-kubewarden-chart-repo
+define install-kubewarden =
 	helm upgrade --install --wait \
 		--kube-context $(CLUSTER_CONTEXT) \
 		--namespace $(NAMESPACE) --create-namespace \
@@ -100,6 +82,57 @@ install-kubewarden: install-cert-manager install-kubewarden-chart-repo
 		--values $(ROOT_RESOURCES_DIR)/default-kubewarden-defaults-values.yaml \
 		$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-defaults
 	$(call kube, wait --for=condition=Ready --namespace $(NAMESPACE) pods --all)
+endef
+
+define install-cert-manager =
+	$(call kube, apply -f https://github.com/jetstack/cert-manager/releases/download/$(CERT_MANAGER_VERSION)/cert-manager.yaml)
+	$(call kube, wait --for=condition=Available deployment --timeout=$(TIMEOUT) -n cert-manager --all)
+endef
+
+define recreate-kubewarden-cluster
+	$(create-cluster)
+	$(install-cert-manager)
+	$(install-kubewarden)
+
+endef
+
+define generate-versioned-resources-dir
+	./scripts/generate_resources_dir.sh $(ROOT_RESOURCES_DIR) $(CRD_VERSION)
+endef
+
+install-k3d:
+	curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | TAG=$(K3D_VERSION) bash
+
+install-kubewarden-chart-repo:
+	helm repo add --force-update $(KUBEWARDEN_HELM_REPO_NAME) $(KUBEWARDEN_HELM_REPO_URL)
+
+.PHONY: generate-versioned-resources-dir
+generate-versioned-resources-dir:
+	$(generate-versioned-resources-dir)
+
+.PHONY: setup
+setup: install-k3d install-kubewarden-chart-repo
+
+.PHONY: install-cert-manager
+install-cert-manager:
+	$(call kube, apply -f https://github.com/jetstack/cert-manager/releases/download/$(CERT_MANAGER_VERSION)/cert-manager.yaml)
+	$(call kube, wait --for=condition=Available deployment --timeout=$(TIMEOUT) -n cert-manager --all)
+
+.PHONY: delete-k8s-cluster
+delete-k8s-cluster:
+	$(delete-cluster)
+
+.PHONY: create-k8s-cluster
+create-k8s-cluster: delete-k8s-cluster
+	$(create-cluster)
+
+.PHONY: install-kubewarden
+install-kubewarden: install-cert-manager install-kubewarden-chart-repo
+	$(install-kubewarden)
+
+.PHONY: restart-kubewarden-cluster
+restart-kubewarden-cluster: 
+	$(recreate-kubewarden-cluster)
 
 .PHONY: delete-kubewarden
 delete-kubewarden:
@@ -152,3 +185,19 @@ upgrade-test: create-k8s-cluster install-kubewarden-chart-repo install-cert-mana
 	mkdir $(RESOURCES_DIR)
 	find $(ROOT_RESOURCES_DIR) -maxdepth 1 -type f  -exec cp \{\}  $(RESOURCES_DIR) \;
 	$(call bats, $(TESTS_DIR)/upgrade.bats)
+
+.PHONY: run-all
+run-all: install-kubewarden-chart-repo
+	$(generate-versioned-resources-dir)
+	$(recreate-kubewarden-cluster)
+	$(call bats, $(TESTS_DIR)/basic-end-to-end-tests.bats)
+	$(recreate-kubewarden-cluster)
+	$(call bats, $(TESTS_DIR)/namespaced-admission-policy-tests.bats)
+	$(recreate-kubewarden-cluster)
+	$(call bats, $(TESTS_DIR)/mutating-requests-tests.bats)
+	$(recreate-kubewarden-cluster)
+	$(call bats, $(TESTS_DIR)/secure-supply-chain-tests.bats)
+	$(recreate-kubewarden-cluster)
+	$(call bats, $(TESTS_DIR)/monitor-mode-tests.bats)
+
+
