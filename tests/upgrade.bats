@@ -59,7 +59,14 @@ source $BATS_TEST_DIRNAME/common.bash
 
 @test "[CRD upgrade] Try to install a object with a old CRD version" {
 	apply_admission_policy $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
-	crd_version=$(kubectl --context $CLUSTER_CONTEXT get clusteradmissionpolicy -o json | jq -r ".items[].apiVersion" | uniq)
+	crd_version=$(kubectl --context $CLUSTER_CONTEXT get admissionPolicy -o json | jq -r ".items[].apiVersion" | uniq)
 	[ "$crd_version" = "policies.kubewarden.io/v1" ]
+}
+
+@test "[CRD upgrade] Privileged pod should be launched after delete old policies" {
+	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
+	kubectl --context $CLUSTER_CONTEXT create namespace testns
+
+	kubectl_namespace_apply_should_succeed $RESOURCES_DIR/violate-privileged-pod-policy.yaml testns
 }
 

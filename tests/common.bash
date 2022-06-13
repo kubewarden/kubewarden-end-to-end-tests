@@ -27,6 +27,11 @@ function kubectl_apply_should_succeed {
 	[ "$status" -eq 0 ]
 }
 
+function kubectl_namespace_apply_should_succeed {
+	run kubectl --context $CLUSTER_CONTEXT --namespace $2 apply --wait --timeout $TIMEOUT  -f $1
+	[ "$status" -eq 0 ]
+}
+
 function apply_cluster_admission_policy {
 	kubectl_apply_should_succeed $1
 	wait_for_all_cluster_admission_policies_to_be_active
