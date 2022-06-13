@@ -4,11 +4,6 @@ TESTS_DIR ?= $(mkfile_dir)tests
 # directory with all the "template" files used to generated the files used during
 # the tests.
 ROOT_RESOURCES_DIR ?= $(mkfile_dir)resources
-# directory with all the files used during the tests. This files are copied from
-# $(ROOT_RESOURCES_DIR) and changed to used the CRDs version defined in $(CRD_VERSION)
-RESOURCES_DIR ?= $(ROOT_RESOURCES_DIR)/resources_$(CRD_VERSION)
-# CRD version to be tested
-CRD_VERSION ?= v1
 # timeout for the kubectl commands
 TIMEOUT ?= 5m
 CONTROLLER_CHART ?= kubewarden/kubewarden-controller
@@ -34,6 +29,13 @@ KUBEWARDEN_DEFAULTS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_
 KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json --devel | jq ".[1].version" | sed "s/\"//g")
 KUBEWARDEN_DEFAULTS_CHART_RELEASE ?= kubewarden-defaults
 CERT_MANAGER_VERSION ?= v1.5.3
+#
+# CRD version to be tested
+CRD_VERSION ?= $(shell helm show values $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --version $(KUBEWARDEN_DEFAULTS_CHART_VERSION) | yq ".crdVersion" | sed "s/\"//g")
+CRD_VERSION_SUFFIX ?= $(shell echo $(CRD_VERSION) | sed -n  "s/.*\/\(.*\)/\1/p")
+# directory with all the files used during the tests. This files are copied from
+# $(ROOT_RESOURCES_DIR) and changed to used the CRDs version defined in $(CRD_VERSION)
+RESOURCES_DIR ?= $(ROOT_RESOURCES_DIR)/resources_$(CRD_VERSION_SUFFIX)
 
 CLUSTER_NAME ?= kubewarden-testing #$(shell echo kubewarden-tests-$(KUBEWARDEN_CONTROLLER_CHART_VERSION) | sed 's/\./-/g')
 CLUSTER_CONTEXT ?= k3d-$(CLUSTER_NAME)
@@ -72,14 +74,17 @@ define install-kubewarden =
 	helm upgrade --install --wait \
 		--kube-context $(CLUSTER_CONTEXT) \
 		--namespace $(NAMESPACE) --create-namespace \
+		--version $(KUBEWARDEN_CRDS_CHART_VERSION) \
 		$(KUBEWARDEN_CRDS_CHART_RELEASE) $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-crds
 	helm upgrade --install --wait --namespace $(NAMESPACE) \
 		--kube-context $(CLUSTER_CONTEXT) \
 		--values $(ROOT_RESOURCES_DIR)/default-kubewarden-controller-values.yaml \
+		--version $(KUBEWARDEN_CONTROLLER_CHART_VERSION) \
 		$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-controller
 	helm upgrade --install --wait --namespace $(NAMESPACE) \
 		--kube-context $(CLUSTER_CONTEXT) \
 		--values $(ROOT_RESOURCES_DIR)/default-kubewarden-defaults-values.yaml \
+		--version $(KUBEWARDEN_DEFAULTS_CHART_VERSION) \
 		$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-defaults
 	$(call kube, wait --for=condition=Ready --namespace $(NAMESPACE) pods --all)
 endef
@@ -97,7 +102,7 @@ define recreate-kubewarden-cluster
 endef
 
 define generate-versioned-resources-dir
-	./scripts/generate_resources_dir.sh $(ROOT_RESOURCES_DIR) $(CRD_VERSION)
+	./scripts/generate_resources_dir.sh $(ROOT_RESOURCES_DIR) $(CRD_VERSION) $(CRD_VERSION_SUFFIX)
 endef
 
 install-k3d:
