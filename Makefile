@@ -24,14 +24,14 @@ KUBEWARDEN_HELM_REPO_URL ?= https://charts.kubewarden.io
 # But the chart name must be equal of the names in the Helm chart repository.
 KUBEWARDEN_CHARTS_LOCATION ?= kubewarden
 
-KUBEWARDEN_CONTROLLER_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) --versions -o json | jq ".[0].version" | sed "s/\"//g")
-KUBEWARDEN_CONTROLLER_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) --versions -o json | jq ".[1].version" | sed "s/\"//g")
+KUBEWARDEN_CONTROLLER_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) --versions -o json --devel | jq ".[0].version" | sed "s/\"//g")
+KUBEWARDEN_CONTROLLER_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) --versions -o json --devel | jq ".[1].version" | sed "s/\"//g")
 KUBEWARDEN_CONTROLLER_CHART_RELEASE ?= kubewarden-controller
-KUBEWARDEN_CRDS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE) --versions -o json | jq ".[0].version" | sed "s/\"//g")
-KUBEWARDEN_CRDS_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE) --versions -o json | jq ".[1].version" | sed "s/\"//g")
+KUBEWARDEN_CRDS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE) --versions -o json --devel | jq ".[0].version" | sed "s/\"//g")
+KUBEWARDEN_CRDS_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE) --versions -o json --devel | jq ".[1].version" | sed "s/\"//g")
 KUBEWARDEN_CRDS_CHART_RELEASE ?= kubewarden-crds
-KUBEWARDEN_DEFAULTS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json | jq ".[0].version" | sed "s/\"//g")
-KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json | jq ".[1].version" | sed "s/\"//g")
+KUBEWARDEN_DEFAULTS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json --devel | jq ".[0].version" | sed "s/\"//g")
+KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json --devel | jq ".[1].version" | sed "s/\"//g")
 KUBEWARDEN_DEFAULTS_CHART_RELEASE ?= kubewarden-defaults
 CERT_MANAGER_VERSION ?= v1.5.3
 
