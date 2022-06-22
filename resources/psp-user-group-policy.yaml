@@ -4,7 +4,7 @@ metadata:
   name: psp-user-group
 spec:
   policyServer: default
-  module: registry://ghcr.io/kubewarden/policies/psp-user-group:v0.1.1
+  module: registry://ghcr.io/kubewarden/tests/psp-user-group:v0.1.1
   namespaceSelector:
     matchExpressions:
       - key: "kubernetes.io/metadata.name"
