@@ -44,12 +44,12 @@ jobs:
         with:
           repository: "${{ github.repository_owner }}/kubewarden-end-to-end-tests"
           path: "e2e-tests"
-          ref: "v0.2.3"
+          ref: 'main'
           fetch-depth: 0
       - name: "Setup bats testing framework"
         uses: mig4/setup-bats@v1.2.0
         with:
-          bats-version: 1.5.0
+          bats-version: 1.7.0
       - name: "Create Kubernetes cluster with Kubewarden installed"
         uses: kubewarden/setup-kubewarden-cluster-action@v1.1.0
         with:

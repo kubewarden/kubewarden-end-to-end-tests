@@ -1,11 +1,13 @@
 #!/usr/bin/env bats
 
-source $BATS_TEST_DIRNAME/common.bash
+setup() {
+	load common.bash
+	wait_pods
+}
 
-setup_file() {
-	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found pods --all
-	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found clusteradmissionpolicies --all
-	kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready -n kubewarden pod --all
+teardown_file() {
+	kubectl delete --wait --ignore-not-found pods --all
+	kubectl delete --wait --ignore-not-found clusteradmissionpolicies --all
 }
 
 @test "[Monitor mode end-to-end tests] Install ClusterAdmissionPolicy in monitor mode" {
@@ -13,7 +15,7 @@ setup_file() {
 }
 
 @test "[Monitor mode end-to-end tests] Launch a privileged pod should succeed" {
-	kubectl_apply_should_succeed $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+	kubectl_apply $RESOURCES_DIR/violate-privileged-pod-policy.yaml
 	default_policy_server_should_have_log_line "policy evaluation (monitor mode)"
 	default_policy_server_should_have_log_line "allowed: false"
 	default_policy_server_should_have_log_line "cannot schedule privileged containers"

@@ -11,7 +11,10 @@ teardown_file() {
 }
 
 setup() {
-	clean_up_environment
+	kubectl delete --wait --ignore-not-found pods --all
+	kubectl delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
+	kubectl delete --wait --ignore-not-found -n kubewarden admissionpolicies --all
+	kubectl wait --for=condition=Ready -n kubewarden pod --all
 	kubectl_delete_configmap_by_name $SECURE_SUPPLY_CHAIN_VERIFICATION_CONFIG_MAP_NAME
 }
 
@@ -28,7 +31,7 @@ setup() {
 	wait_for_default_policy_server_rollout
 	helm upgrade --set policyServer.verificationConfig=$SECURE_SUPPLY_CHAIN_VERIFICATION_CONFIG_MAP_NAME --wait -n kubewarden kubewarden-defaults kubewarden/kubewarden-defaults
 	wait_for_default_policy_server_rollout
-	kubectl_apply_should_succeed $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
+	kubectl_apply $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
 	# Policy Server startup should fail
 	default_policy_server_rollout_should_fail
 }
