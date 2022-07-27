@@ -1,12 +1,14 @@
 #!/usr/bin/env bats
 
-source $BATS_TEST_DIRNAME/common.bash
+setup() {
+	load common.bash
+	wait_pods
+}
 
-setup_file() {
-	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found pods --all
-	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
-	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found -n kubewarden admissionpolicies --all
-	kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready -n kubewarden pod --all
+teardown_file() {
+	kubectl delete --wait --ignore-not-found pods --all
+	kubectl delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
+	kubectl delete --wait --ignore-not-found -n kubewarden admissionpolicies --all
 }
 
 @test "[AdmissionPolicy end-to-end tests] Install AdmissionPolicy" {
@@ -22,16 +24,15 @@ setup_file() {
 }
 
 @test  "[AdmissionPolicy tests] Launch a pod which does not violate privileged pod policy" {
-	kubectl_apply_should_succeed $RESOURCES_DIR/not-violate-privileged-pod-policy.yaml
+	kubectl_apply $RESOURCES_DIR/not-violate-privileged-pod-policy.yaml
 }
 
 @test  "[AdmissionPolicy tests] Update privileged pod policy to check only UPDATE operations" {
-        run kubectl --context $CLUSTER_CONTEXT patch admissionpolicy privileged-pods --type=json -p ' [{ "op": "remove", "path": "/spec/rules/0/operations/1" }, { "op": "replace", "path": "/spec/rules/0/operations/0", "value": "UPDATE" } ]'
-	[ "$status" -eq 0 ]
+        kubectl patch admissionpolicy privileged-pods --type=json -p ' [{ "op": "remove", "path": "/spec/rules/0/operations/1" }, { "op": "replace", "path": "/spec/rules/0/operations/0", "value": "UPDATE" } ]'
 }
 
 @test "[AdmissionPolicy tests] Launch a pod which violate privileged pod policy after policy change should work" {
-	kubectl_apply_should_succeed $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+	kubectl_apply $RESOURCES_DIR/violate-privileged-pod-policy.yaml
 }
 
 @test "[AdmissionPolicy tests] Delete AdmissionPolicy" {
@@ -39,5 +40,5 @@ setup_file() {
 }
 
 @test "[AdmissionPolicy tests] Launch a pod which violate privileged pod policy after policy deletion should work" {
-	kubectl_apply_should_succeed $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+	kubectl_apply $RESOURCES_DIR/violate-privileged-pod-policy.yaml
 }

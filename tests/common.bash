@@ -1,14 +1,60 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-function clean_up_environment {
-	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found pods --all
-	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
-	kubectl --context $CLUSTER_CONTEXT delete --wait --ignore-not-found -n kubewarden admissionpolicies --all
-	kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready -n kubewarden pod --all
+bats_require_minimum_version 1.5.0
+
+function kubectl() {
+	command kubectl --context $CLUSTER_CONTEXT "$@"
+}
+
+function helm() {
+	command helm --kube-context $CLUSTER_CONTEXT "$@"
+}
+
+function retry() {
+    local cmd=$1
+    local tries=${2:-10}
+    local delay=${3:-30}
+    local i
+    for ((i=1; i<=tries; i++)); do
+        timeout 25 bash -c "$cmd" && break || echo "RETRY #$i: $cmd"
+        [ $i -ne $tries ] && sleep $delay || { echo "Godot: $cmd"; false; }
+    done
+}
+
+# Safe version of waiting for pods. Looks in kube-system ns by default
+# Handles kube-api disconnects during upgrade
+function wait_pods() {
+    local i output
+    for i in {1..90}; do
+        output=$(kubectl get pods --no-headers -o wide ${@:--n kube-system} | grep -vw Completed || echo 'Fail')
+        grep -vE '([0-9]+)/\1 +Running' <<< $output || break
+        [ $i -ne 6 ] && sleep 30 || { echo "Godot: pods not running"; false; }
+    done
+}
+
+# Safe version of waiting for nodes
+# Handles kube-api disconnects during upgrade
+function wait_nodes() {
+    local i output
+    for i in {1..30}; do
+        output=$(kubectl get nodes --no-headers ${@:-} || echo 'Fail')
+        grep -vE '\bReady\b' <<< $output || break
+        [ $i -ne 6 ] && sleep 30 || { echo "Godot: nodes not running"; false; }
+    done
+}
+
+function wait_deploy () { kubectl wait deployment --timeout=5m --for=condition=available "$@"; }
+function wait_rollout() { kubectl rollout status  --timeout=5m "$@"; }
+
+# Wait for cluster to come up after reboot
+function wait_cluster() {
+    retry "kubectl cluster-info" 20 30
+    wait_nodes
+    wait_pods
 }
 
 function kubectl_apply_should_fail {
-	run kubectl --context $CLUSTER_CONTEXT apply --wait --timeout $TIMEOUT  -f $1
+	run kubectl apply --wait --timeout $TIMEOUT  -f $1
 	[ "$status" -ne 0 ]
 }
 
@@ -22,103 +68,59 @@ function kubectl_apply_should_fail_with_message {
 	fi
 }
 
-function kubectl_apply_should_succeed {
-	run kubectl --context $CLUSTER_CONTEXT apply --wait --timeout $TIMEOUT  -f $1
-	[ "$status" -eq 0 ]
-}
-
-function kubectl_namespace_apply_should_succeed {
-	run kubectl --context $CLUSTER_CONTEXT --namespace $2 apply --wait --timeout $TIMEOUT  -f $1
-	[ "$status" -eq 0 ]
+function kubectl_apply {
+	kubectl apply --wait --timeout $TIMEOUT -f $1
 }
 
 function apply_cluster_admission_policy {
-	kubectl_apply_should_succeed $1
-	wait_for_all_cluster_admission_policies_to_be_active
+	kubectl_apply $1
+	wait_for_cluster_admission_policy PolicyActive
 	wait_for_default_policy_server_rollout
-	wait_for_all_cluster_admission_policy_condition PolicyUniquelyReachable
+	wait_for_cluster_admission_policy PolicyUniquelyReachable
 }
 
 function apply_admission_policy {
-	kubectl_apply_should_succeed $1
-	wait_for_all_admission_policies_to_be_active
+	kubectl_apply $1
+	wait_for_admission_policy PolicyActive
 	wait_for_default_policy_server_rollout
-	wait_for_all_admission_policy_condition PolicyUniquelyReachable
+	wait_for_admission_policy PolicyUniquelyReachable
 }
 
 function kubectl_delete {
-	run kubectl --context $CLUSTER_CONTEXT  delete --wait --timeout $TIMEOUT --ignore-not-found -f $1
-	[ "$status" -eq 0 ]
+	kubectl delete --wait --timeout $TIMEOUT --ignore-not-found -f $1
 }
 
 function kubectl_delete_by_type_and_name {
-	run kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE delete --wait --timeout $TIMEOUT  --ignore-not-found $1 $2
-	[ "$status" -eq 0 ]
+	kubectl -n $NAMESPACE delete --wait --timeout $TIMEOUT --ignore-not-found $1 $2
 }
 
 function kubectl_delete_configmap_by_name {
 	kubectl_delete_by_type_and_name configmap $1
 }
 
-function wait_for_all_cluster_admission_policies_to_be_active {
-	wait_for_all_cluster_admission_policy_condition PolicyActive
+function wait_for_admission_policy {
+	kubectl wait --timeout $TIMEOUT --for=condition="$1" admissionpolicies --all -A
 }
 
-function wait_for_all_cluster_admission_policy_condition {
-	run kubectl --context $CLUSTER_CONTEXT wait --timeout $TIMEOUT --for=condition="$1" clusteradmissionpolicies --all
-	[ "$status" -eq 0 ]
-}
-
-function wait_for_all_admission_policies_to_be_active {
-	run kubectl --context $CLUSTER_CONTEXT wait --timeout $TIMEOUT --for=condition=PolicyActive admissionpolicies -A --all
-	[ "$status" -eq 0 ]
-}
-
-function wait_for_all_admission_policy_condition {
-	run kubectl --context $CLUSTER_CONTEXT wait --timeout $TIMEOUT --for=condition="$1" admissionpolicies -A --all
-	[ "$status" -eq 0 ]
-}
-
-function wait_for_all_pods_to_be_ready {
-	wait_for_default_policy_server_rollout
-	run kubectl --context $CLUSTER_CONTEXT wait --for=condition=Ready --timeout $TIMEOUT -n $NAMESPACE pod --all
-	[ "$status" -eq 0 ]
+function wait_for_cluster_admission_policy {
+	kubectl wait --timeout $TIMEOUT --for=condition="$1" clusteradmissionpolicies --all
 }
 
 function wait_for_default_policy_server_rollout {
-	wait_for_policy_server_rollout default
+	revision=$(kubectl -n $NAMESPACE get "deployment/policy-server-default" -o json | jq -r '.metadata.annotations."deployment.kubernetes.io/revision"')
+	wait_rollout -n $NAMESPACE --revision $revision "deployment/policy-server-default"
 }
 
 function default_policy_server_rollout_should_fail {
-	revision=$(kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE get "deployment/policy-server-default" -o json | jq ".metadata.annotations.\"deployment.kubernetes.io/revision\"" | sed "s/\"//g")
-	run kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE rollout status --revision $revision --timeout $TIMEOUT "deployment/policy-server-default"
+	revision=$(kubectl -n $NAMESPACE get "deployment/policy-server-default" -o json | jq -r '.metadata.annotations."deployment.kubernetes.io/revision"')
+	run kubectl -n $NAMESPACE rollout status --revision $revision --timeout $TIMEOUT "deployment/policy-server-default"
 	[ "$status" -ne 0 ]
 }
 
-function wait_for_policy_server_rollout {
-	revision=$(kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE get "deployment/policy-server-$1" -o json | jq ".metadata.annotations.\"deployment.kubernetes.io/revision\"" | sed "s/\"//g")
-	run kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE rollout status --revision $revision "deployment/policy-server-$1"
-}
-
 function default_policy_server_should_have_log_line {
-	policy_server_should_have_log_line default "$1"
-}
-
-function policy_server_should_have_log_line {
-	run kubectl --context $CLUSTER_CONTEXT logs -n $NAMESPACE -lapp="kubewarden-policy-server-$1" | grep "$2"
+	kubectl logs -n $NAMESPACE -lapp="kubewarden-policy-server-default" | grep "$1"
 }
 
 function create_configmap_from_file_with_root_key {
-	run kubectl --context $CLUSTER_CONTEXT -n $NAMESPACE create configmap $1 --from-file=$2=$3
+	kubectl -n $NAMESPACE create configmap $1 --from-file=$2=$3
 }
-
-function kubewarden_crds_should_not_be_installed {
-	run kubectl --context $CLUSTER_CONTEXT get crds policyservers.policies.kubewarden.io clusteradmissionpolicies.policies.kubewarden.io admissionpolicies.policies.kubewarden.io
-}
-
-
-function install_kubewarden_stack {
-	run helm install --kube-context $CLUSTER_CONTEXT --wait -n kubewarden --create-namespace kubewarden-crds kubewarden/kubewarden-crds
-	run helm install --kube-context $CLUSTER_CONTEXT --wait -n kubewarden kubewarden-controller kubewarden/kubewarden-controller
-	run helm install --kube-context $CLUSTER_CONTEXT --wait -n kubewarden kubewarden-defaults kubewarden/kubewarden-defaults
-} 
