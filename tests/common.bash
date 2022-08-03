@@ -2,6 +2,9 @@
 
 bats_require_minimum_version 1.5.0
 
+load "../helpers/bats-support/load.bash"
+load "../helpers/bats-assert/load.bash"
+
 function kubectl() {
 	command kubectl --context $CLUSTER_CONTEXT "$@"
 }
@@ -55,17 +58,13 @@ function wait_cluster() {
 
 function kubectl_apply_should_fail {
 	run kubectl apply --wait --timeout $TIMEOUT  -f $1
-	[ "$status" -ne 0 ]
+	assert_failure
 }
 
 function kubectl_apply_should_fail_with_message {
-	kubectl_apply_should_fail $1
-	if [[ $output != *"$2"* ]]; then
-		echo "Missing string in the output:"
-		echo "Output: $output"
-		echo "Missing string: $2"
-		fail
-	fi
+	run kubectl apply --wait --timeout $TIMEOUT  -f $1
+	assert_failure
+	assert_output --partial "$2"
 }
 
 function kubectl_apply {
@@ -114,7 +113,7 @@ function wait_for_default_policy_server_rollout {
 function default_policy_server_rollout_should_fail {
 	revision=$(kubectl -n $NAMESPACE get "deployment/policy-server-default" -o json | jq -r '.metadata.annotations."deployment.kubernetes.io/revision"')
 	run kubectl -n $NAMESPACE rollout status --revision $revision --timeout $TIMEOUT "deployment/policy-server-default"
-	[ "$status" -ne 0 ]
+	assert_failure
 }
 
 function default_policy_server_should_have_log_line {
