@@ -54,11 +54,7 @@ bats = RESOURCES_DIR=$(RESOURCES_DIR) \
 	CONTROLLER_CHART=$(CONTROLLER_CHART) \
 	CLUSTER_CONTEXT=$(CLUSTER_CONTEXT) \
 	NAMESPACE=$(NAMESPACE) \
-		bats \
-		--verbose-run \
-		--show-output-of-passing-tests \
-		--print-output-on-failure \
-		$(1)
+		bats --print-output-on-failure $(1)
 
 define delete-cluster =
 	- k3d cluster delete $(CLUSTER_NAME)
