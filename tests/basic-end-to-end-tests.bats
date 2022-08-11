@@ -48,16 +48,12 @@ teardown_file() {
 	kubectl get pod pause-user-group -o json | jq -e ".spec.containers[].securityContext.runAsUser==1000"
 }
 
-@test "[Basic end-to-end tests] Launch second policy server" {
-	kubectl_apply $RESOURCES_DIR/policy-server.yaml
-}
+@test "[Basic end-to-end tests] Launch & scale second policy server" {
+	kubectl apply -f $RESOURCES_DIR/policy-server.yaml
+	kubectl wait policyserver e2e-tests --for=condition=ServiceReconciled
 
-@test "[Basic end-to-end tests] Scale up PolicyServer" {
-	kubectl patch policyserver default --type=merge -p '{"spec": {"replicas": 2}}'
-	wait_for_default_policy_server_rollout
-}
+	kubectl patch policyserver e2e-tests --type=merge -p '{"spec": {"replicas": 2}}'
+	wait_rollout -n kubewarden deployment/policy-server-e2e-tests
 
-@test "[Basic end-to-end tests] Delete policy server" {
-	kubectl_delete $RESOURCES_DIR/policy-server.yaml
-	wait_for_default_policy_server_rollout
+	kubectl delete -f $RESOURCES_DIR/policy-server.yaml
 }
