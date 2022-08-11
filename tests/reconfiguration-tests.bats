@@ -2,25 +2,16 @@
 
 setup() {
 	load common.bash
-	wait_pods
+	wait_pods -n kubewarden
 }
 
 teardown_file() {
-	kubectl delete --wait --timeout $TIMEOUT --ignore-not-found clusteradmissionpolicies --all
-	kubectl delete --wait --timeout $TIMEOUT --ignore-not-found -f $RESOURCES_DIR/violate-privileged-pod-policy.yaml
-	kubectl delete --wait --timeout $TIMEOUT --ignore-not-found -f $RESOURCES_DIR/not-violate-privileged-pod-policy.yaml
+	kubectl delete pods --all
+	kubectl delete clusteradmissionpolicies --all
 }
 
-@test "[Reconfiguration tests] Test apply policy" {
+@test "[Reconfiguration tests] Apply pod-privileged policy" {
 	apply_cluster_admission_policy $RESOURCES_DIR/privileged-pod-policy.yaml
-}
-
-@test "[Reconfiguration tests] Test apply pod which violate a policy" {
-	kubectl_apply_should_fail $RESOURCES_DIR/violate-privileged-pod-policy.yaml
-}
-
-@test "[Reconfiguration tests] Test apply pod which does not violate a policy" {
-	kubectl_apply $RESOURCES_DIR/not-violate-privileged-pod-policy.yaml
 }
 
 @test "[Reconfiguration tests] Reconfigure Kubewarden stack" {
@@ -30,17 +21,18 @@ teardown_file() {
 	wait_for_cluster_admission_policy PolicyActive
 }
 
-@test "[Reconfiguration tests] Install psp-user-group ClusterAdmissionPolicy after reconfiguration" {
+@test "[Reconfiguration tests] Apply psp-user-group policy" {
 	apply_cluster_admission_policy $RESOURCES_DIR/psp-user-group-policy.yaml
 }
 
-@test "[Reconfiguration tests] Test apply pod which violate a policy after reconfiguration" {
-	kubectl_delete $RESOURCES_DIR/violate-privileged-pod-policy.yaml
-	kubectl_apply_should_fail $RESOURCES_DIR/violate-privileged-pod-policy.yaml
-}
+@test "[Reconfiguration tests] Test that pod-privileged policy works" {
+	# Launch unprivileged pod
+	kubectl run pause-unprivileged --image k8s.gcr.io/pause
+	kubectl wait --for=condition=Ready pod pause-unprivileged
 
-@test "[Reconfiguration tests] Test apply pod which does not violate a policy after reconfiguration" {
-	kubectl_delete $RESOURCES_DIR/not-violate-privileged-pod-policy.yaml
-	kubectl_apply $RESOURCES_DIR/not-violate-privileged-pod-policy.yaml
+	# Launch privileged pod (should fail)
+	run kubectl run pause-privileged --image k8s.gcr.io/pause --privileged
+	assert_failure
+	assert_output --regexp '^Error.*: admission webhook.*denied the request.*cannot schedule privileged containers$'
+	run ! kubectl get pods pause-privileged
 }
-
