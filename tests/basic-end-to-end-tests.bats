@@ -6,8 +6,9 @@ setup() {
 }
 
 teardown_file() {
-	kubectl delete --wait --ignore-not-found pods --all
-	kubectl delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
+	kubectl delete pods --all
+	kubectl delete clusteradmissionpolicies --all
+	kubectl delete -f $RESOURCES_DIR/policy-server.yaml --ignore-not-found
 }
 
 @test "[Basic end-to-end tests] Install ClusterAdmissionPolicy" {
