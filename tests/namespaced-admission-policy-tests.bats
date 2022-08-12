@@ -24,7 +24,7 @@ teardown_file() {
 }
 
 @test  "[AdmissionPolicy tests] Launch a pod which does not violate privileged pod policy" {
-	kubectl_apply $RESOURCES_DIR/not-violate-privileged-pod-policy.yaml
+	kubectl apply -f $RESOURCES_DIR/not-violate-privileged-pod-policy.yaml
 }
 
 @test  "[AdmissionPolicy tests] Update privileged pod policy to check only UPDATE operations" {
@@ -32,7 +32,7 @@ teardown_file() {
 }
 
 @test "[AdmissionPolicy tests] Launch a pod which violate privileged pod policy after policy change should work" {
-	kubectl_apply $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+	kubectl apply -f $RESOURCES_DIR/violate-privileged-pod-policy.yaml
 }
 
 @test "[AdmissionPolicy tests] Delete AdmissionPolicy" {
@@ -40,5 +40,5 @@ teardown_file() {
 }
 
 @test "[AdmissionPolicy tests] Launch a pod which violate privileged pod policy after policy deletion should work" {
-	kubectl_apply $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+	kubectl apply -f $RESOURCES_DIR/violate-privileged-pod-policy.yaml
 }

@@ -15,7 +15,7 @@ teardown_file() {
 }
 
 @test "[Monitor mode end-to-end tests] Launch a privileged pod should succeed" {
-	kubectl_apply $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+	kubectl apply -f $RESOURCES_DIR/violate-privileged-pod-policy.yaml
 	default_policy_server_should_have_log_line "policy evaluation (monitor mode)"
 	default_policy_server_should_have_log_line "allowed: false"
 	default_policy_server_should_have_log_line "cannot schedule privileged containers"

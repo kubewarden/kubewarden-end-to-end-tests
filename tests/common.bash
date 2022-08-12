@@ -67,19 +67,15 @@ function kubectl_apply_should_fail_with_message {
 	assert_output --partial "$2"
 }
 
-function kubectl_apply {
-	kubectl apply -f $1
-}
-
 function apply_cluster_admission_policy {
-	kubectl_apply $1
+	kubectl apply -f $1
 	wait_for_cluster_admission_policy PolicyActive
 	wait_for_default_policy_server_rollout
 	wait_for_cluster_admission_policy PolicyUniquelyReachable
 }
 
 function apply_admission_policy {
-	kubectl_apply $1
+	kubectl apply -f $1
 	wait_for_admission_policy PolicyActive
 	wait_for_default_policy_server_rollout
 	wait_for_admission_policy PolicyUniquelyReachable
