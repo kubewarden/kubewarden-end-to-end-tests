@@ -85,12 +85,8 @@ function kubectl_delete {
 	kubectl delete --ignore-not-found -f $1
 }
 
-function kubectl_delete_by_type_and_name {
-	kubectl -n $NAMESPACE delete --ignore-not-found $1 $2
-}
-
 function kubectl_delete_configmap_by_name {
-	kubectl_delete_by_type_and_name configmap $1
+	kubectl -n $NAMESPACE delete --ignore-not-found configmap $1
 }
 
 function wait_for_admission_policy {
