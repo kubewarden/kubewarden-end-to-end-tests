@@ -6,26 +6,30 @@ setup() {
 }
 
 teardown_file() {
-	kubectl delete --wait --ignore-not-found pods --all
-	kubectl delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
+	kubectl delete pods --all
+	kubectl delete clusteradmissionpolicies --all
 }
 
-@test "[Mutation request tests] Install mutate policy with mutating flag enabled" {
+# Same as in basic e2e tests?
+@test "[Mutation request tests] Test psp-user-group policy with mutating flag enabled" {
 	apply_cluster_admission_policy $RESOURCES_DIR/mutate-policy-with-flag-enabled.yaml
-}
 
-@test "[Mutation request tests] Launch a pod that should be mutate by psp-user-group-policy" {
-	kubectl_apply $RESOURCES_DIR/mutate-pod-psp-user-group-policy.yaml
+	# New pod should be mutated by the policy
+	kubectl run pause-user-group --image k8s.gcr.io/pause
 	kubectl wait --for=condition=Ready pod pause-user-group
 	kubectl get pod pause-user-group -o json | jq -e ".spec.containers[].securityContext.runAsUser==1000"
+	kubectl delete pod pause-user-group
+
+	kubectl delete -f $RESOURCES_DIR/mutate-policy-with-flag-enabled.yaml
 }
 
-@test "[Mutation request tests] Install mutate policy with mutating flag disabled" {
-	kubectl_delete $RESOURCES_DIR/mutate-policy-with-flag-enabled.yaml
+@test "[Mutation request tests] Test psp-user-group policy with mutating flag disabled" {
 	apply_cluster_admission_policy $RESOURCES_DIR/mutate-policy-with-flag-disabled.yaml
-}
 
-@test "[Mutation request tests] Launch a pod that should be reject by psp-user-group-policy" {
-	kubectl_delete $RESOURCES_DIR/mutate-pod-psp-user-group-policy.yaml
-	kubectl_apply_should_fail_with_message $RESOURCES_DIR/mutate-pod-psp-user-group-policy.yaml "The policy attempted to mutate the request, but it is currently configured to not allow mutations"
+	# New pod should be rejected by psp-user-group-policy
+	run kubectl run pause-user-group --image k8s.gcr.io/pause
+	assert_failure
+	assert_output --partial "The policy attempted to mutate the request, but it is currently configured to not allow mutations"
+
+	kubectl delete -f $RESOURCES_DIR/mutate-policy-with-flag-disabled.yaml
 }
