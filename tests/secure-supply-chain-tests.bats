@@ -31,7 +31,7 @@ setup() {
 	wait_for_default_policy_server_rollout
 	helm upgrade --set policyServer.verificationConfig=$SECURE_SUPPLY_CHAIN_VERIFICATION_CONFIG_MAP_NAME --wait -n kubewarden kubewarden-defaults kubewarden/kubewarden-defaults
 	wait_for_default_policy_server_rollout
-	kubectl_apply $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
+	kubectl apply -f $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
 	# Policy Server startup should fail
 	default_policy_server_rollout_should_fail
 }
