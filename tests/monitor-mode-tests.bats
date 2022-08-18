@@ -2,34 +2,36 @@
 
 setup() {
 	load common.bash
-	wait_pods
+	wait_pods -n kubewarden
 }
 
 teardown_file() {
-	kubectl delete --wait --ignore-not-found pods --all
-	kubectl delete --wait --ignore-not-found clusteradmissionpolicies --all
+	kubectl delete pods --all
+	kubectl delete clusteradmissionpolicies --all
 }
 
 @test "[Monitor mode end-to-end tests] Install ClusterAdmissionPolicy in monitor mode" {
 	apply_cluster_admission_policy $RESOURCES_DIR/privileged-pod-policy-monitor.yaml
 }
 
-@test "[Monitor mode end-to-end tests] Launch a privileged pod should succeed" {
-	kubectl apply -f $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+@test "[Monitor mode end-to-end tests] Monitor mode should only log event" {
+	kubectl run nginx-privileged --image=nginx:alpine --privileged
 	default_policy_server_should_have_log_line "policy evaluation (monitor mode)"
 	default_policy_server_should_have_log_line "allowed: false"
 	default_policy_server_should_have_log_line "cannot schedule privileged containers"
-	kubectl_delete $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+	kubectl delete pod nginx-privileged
 }
 
-@test "[Monitor mode end-to-end tests] Transition policy mode from monitor to protect should succeed" {
+@test "[Monitor mode end-to-end tests] Transition to protect should block events" {
 	apply_cluster_admission_policy $RESOURCES_DIR/privileged-pod-policy.yaml
+
+	# Launch privileged pod (should fail)
+	run kubectl run nginx-privileged --image=nginx:alpine --privileged
+	assert_failure
+	assert_output --regexp '^Error.*: admission webhook.*denied the request.*cannot schedule privileged containers$'
+	run ! kubectl get pods nginx-privileged
 }
 
-@test "[Monitor mode end-to-end tests] Launch a privileged pod should fail" {
-	kubectl_apply_should_fail_with_message $RESOURCES_DIR/violate-privileged-pod-policy.yaml "cannot schedule privileged containers"
-}
-
-@test "[Monitor mode end-to-end tests] Transition policy mode from protect to monitor should be disallowed" {
+@test "[Monitor mode end-to-end tests] Transition from protect to monitor should be disallowed" {
 	kubectl_apply_should_fail_with_message $RESOURCES_DIR/privileged-pod-policy-monitor.yaml "field cannot transition from protect to monitor. Recreate instead."
 }
