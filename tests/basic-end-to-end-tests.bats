@@ -6,58 +6,63 @@ setup() {
 }
 
 teardown_file() {
-	kubectl delete --wait --ignore-not-found pods --all
-	kubectl delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
+	kubectl delete pods --all
+	kubectl delete clusteradmissionpolicies --all
+	kubectl delete -f $RESOURCES_DIR/policy-server.yaml --ignore-not-found
 }
 
-@test "[Basic end-to-end tests] Install ClusterAdmissionPolicy" {
+# Create pod-privileged policy to block CREATE & UPDATE of privileged pods
+@test "[Basic end-to-end tests] Apply pod-privileged policy that blocks CREATE & UPDATE" {
 	apply_cluster_admission_policy $RESOURCES_DIR/privileged-pod-policy.yaml
+
+	# Launch unprivileged pod
+	kubectl run nginx-unprivileged --image=nginx:alpine
+	kubectl wait --for=condition=Ready pod nginx-unprivileged
+
+	# Launch privileged pod (should fail)
+	run kubectl run nginx-privileged --image=nginx:alpine --privileged
+	assert_failure
+	assert_output --regexp '^Error.*: admission webhook.*denied the request.*cannot schedule privileged containers$'
+	run ! kubectl get pods nginx-privileged
 }
 
-@test "[Basic end-to-end tests] Launch a privileged pod should fail" {
-	kubectl_apply_should_fail $RESOURCES_DIR/violate-privileged-pod-policy.yaml
-}
+# Update pod-privileged policy to block only UPDATE of privileged pods
+@test  "[Basic end-to-end tests] Patch policy to block only UPDATE operation" {
+        yq '.spec.rules[0].operations = ["UPDATE"]' resources/privileged-pod-policy.yaml | kubectl apply -f -
 
-@test  "[Basic end-to-end tests] Launch a pod which does not violate privileged pod policy" {
-	kubectl_apply $RESOURCES_DIR/not-violate-privileged-pod-policy.yaml
-}
+	# I can create privileged pods now
+	kubectl run nginx-privileged --image=nginx:alpine --privileged
 
-@test  "[Basic end-to-end tests] Update privileged pod policy to check only UPDATE operations" {
-        kubectl patch clusteradmissionpolicy privileged-pods --type=json -p ' [{ "op": "remove", "path": "/spec/rules/0/operations/1" }, { "op": "replace", "path": "/spec/rules/0/operations/0", "value": "UPDATE" } ]'
-}
-
-@test "[Basic end-to-end tests] Launch a pod which violate privileged pod policy after policy change should work" {
-	kubectl_apply $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+	# I can not update privileged pods
+	run kubectl label pod nginx-privileged x=y
+	assert_failure
+	assert_output --regexp '^Error.*: admission webhook.*denied the request.*cannot schedule privileged containers$'
 }
 
 @test "[Basic end-to-end tests] Delete ClusterAdmissionPolicy" {
-	kubectl_delete $RESOURCES_DIR/privileged-pod-policy.yaml
+	kubectl delete --wait -f $RESOURCES_DIR/privileged-pod-policy.yaml
+
+	# I can update privileged pods now
+	kubectl label pod nginx-privileged x=y
 }
 
-@test "[Basic end-to-end tests] Launch a pod which violate privileged pod policy after policy deletion should work" {
-	kubectl_apply $RESOURCES_DIR/violate-privileged-pod-policy.yaml
-}
-
-@test "[Basic end-to-end tests] Install psp-user-group ClusterAdmissionPolicy" {
+@test "[Basic end-to-end tests] Apply mutating psp-user-group ClusterAdmissionPolicy" {
 	apply_cluster_admission_policy $RESOURCES_DIR/psp-user-group-policy.yaml
-}
 
-@test "[Basic end-to-end tests] Launch a pod that should be mutate by psp-user-group-policy" {
-	kubectl_apply $RESOURCES_DIR/mutate-pod-psp-user-group-policy.yaml
+	# Policy should mutate pods
+	kubectl run pause-user-group --image k8s.gcr.io/pause
 	kubectl wait --for=condition=Ready pod pause-user-group
-	kubectl get pod pause-user-group -o json | jq -e ".spec.containers[].securityContext.runAsUser==1000"
+	kubectl get pods pause-user-group -o json | jq -e ".spec.containers[].securityContext.runAsUser==1000"
+
+	kubectl delete --wait -f $RESOURCES_DIR/psp-user-group-policy.yaml
 }
 
-@test "[Basic end-to-end tests] Launch second policy server" {
-	kubectl_apply $RESOURCES_DIR/policy-server.yaml
-}
+@test "[Basic end-to-end tests] Launch & scale second policy server" {
+	kubectl apply -f $RESOURCES_DIR/policy-server.yaml
+	kubectl wait policyserver e2e-tests --for=condition=ServiceReconciled
 
-@test "[Basic end-to-end tests] Scale up PolicyServer" {
-	kubectl patch policyserver default --type=merge -p '{"spec": {"replicas": 2}}'
-	wait_for_default_policy_server_rollout
-}
+	kubectl patch policyserver e2e-tests --type=merge -p '{"spec": {"replicas": 2}}'
+	wait_rollout -n kubewarden deployment/policy-server-e2e-tests
 
-@test "[Basic end-to-end tests] Delete policy server" {
-	kubectl_delete $RESOURCES_DIR/policy-server.yaml
-	wait_for_default_policy_server_rollout
+	kubectl delete -f $RESOURCES_DIR/policy-server.yaml
 }
