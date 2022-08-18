@@ -2,43 +2,62 @@
 
 setup() {
 	load common.bash
-	wait_pods
+	wait_pods -n kubewarden
 }
 
 teardown_file() {
-	kubectl delete --wait --ignore-not-found pods --all
-	kubectl delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
-	kubectl delete --wait --ignore-not-found -n kubewarden admissionpolicies --all
+	kubectl delete pods --all
+	kubectl delete -f $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml --ignore-not-found
 }
 
-@test "[AdmissionPolicy end-to-end tests] Install AdmissionPolicy" {
+@test "[Namespaced AdmissionPolicy] Install AdmissionPolicy" {
 	apply_admission_policy $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
 }
 
-@test "[AdmissionPolicy tests] Launch a privileged pod in the default namespace should fail" {
-	kubectl_apply_should_fail $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+@test "[Namespaced AdmissionPolicy] Privileged pod in the default namespace (should fail)" {
+	# Launch privileged pod (should fail)
+	run kubectl run nginx-privileged --image=nginx:alpine --privileged
+	assert_failure
+	assert_output --regexp '^Error.*: admission webhook.*denied the request.*cannot schedule privileged containers$'
+	run ! kubectl get pods nginx-privileged
 }
 
-@test "[AdmissionPolicy tests] Launch a privileged pod in the kubewarden namespace should work" {
-	kubectl_apply_should_fail $RESOURCES_DIR/violate-privileged-pod-policy.yaml -n kubewarden
+@test "[Namespaced AdmissionPolicy] Privileged pod in the kubewarden namespace (should work)" {
+	kubectl run nginx-privileged --image=nginx:alpine --privileged -n kubewarden
+	kubectl wait --for=condition=Ready pod nginx-privileged -n kubewarden
+	kubectl delete pod nginx-privileged -n kubewarden
 }
 
-@test  "[AdmissionPolicy tests] Launch a pod which does not violate privileged pod policy" {
-	kubectl apply -f $RESOURCES_DIR/not-violate-privileged-pod-policy.yaml
+@test  "[Namespaced AdmissionPolicy] Unprivileged pod in default namespace (should work)" {
+	kubectl run nginx-unprivileged --image=nginx:alpine
+	kubectl wait --for=condition=Ready pod nginx-unprivileged
+	kubectl delete pod nginx-unprivileged
 }
 
-@test  "[AdmissionPolicy tests] Update privileged pod policy to check only UPDATE operations" {
-        kubectl patch admissionpolicy privileged-pods --type=json -p ' [{ "op": "remove", "path": "/spec/rules/0/operations/1" }, { "op": "replace", "path": "/spec/rules/0/operations/0", "value": "UPDATE" } ]'
+@test  "[Namespaced AdmissionPolicy] Update policy to check only UPDATE operations" {
+	yq '.spec.rules[0].operations = ["UPDATE"]' resources/namespaced-privileged-pod-policy.yaml | kubectl apply -f -
 }
 
-@test "[AdmissionPolicy tests] Launch a pod which violate privileged pod policy after policy change should work" {
-	kubectl apply -f $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+@test "[Namespaced AdmissionPolicy] Privileged pod in the default namespace (can't update)" {
+	# I can create privileged pods now
+	kubectl run nginx-privileged --image=nginx:alpine --privileged
+
+	# I can not update privileged pods
+	run kubectl label pod nginx-privileged x=y
+	assert_failure
+	assert_output --regexp '^Error.*: admission webhook.*denied the request.*cannot schedule privileged containers$'
+
+	kubectl delete pod nginx-privileged
 }
 
-@test "[AdmissionPolicy tests] Delete AdmissionPolicy" {
-	kubectl_delete $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
+@test "[Namespaced AdmissionPolicy] Delete AdmissionPolicy" {
+	kubectl delete -f $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
 }
 
-@test "[AdmissionPolicy tests] Launch a pod which violate privileged pod policy after policy deletion should work" {
-	kubectl apply -f $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+@test "[Namespaced AdmissionPolicy] Privileged pod in the default namespace (no restrictions)" {
+	# I can create privileged pods
+	kubectl run nginx-privileged --image=nginx:alpine --privileged
+
+	# I can update privileged pods
+	kubectl label pod nginx-privileged x=y
 }
