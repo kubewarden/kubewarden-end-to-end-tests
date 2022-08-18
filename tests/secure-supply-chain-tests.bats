@@ -27,7 +27,7 @@ setup() {
 
 @test "[Secure Supply Chain tests] Untrusted policy should block policy server to run" {
 	create_configmap_from_file_with_root_key $SECURE_SUPPLY_CHAIN_VERIFICATION_CONFIG_MAP_NAME verification-config $RESOURCES_DIR/restricted-secure-supply-chain-verification-config.yaml
-	kubectl_delete $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
+	kubectl delete -f $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
 	wait_for_default_policy_server_rollout
 	helm upgrade --set policyServer.verificationConfig=$SECURE_SUPPLY_CHAIN_VERIFICATION_CONFIG_MAP_NAME --wait -n kubewarden kubewarden-defaults kubewarden/kubewarden-defaults
 	wait_for_default_policy_server_rollout

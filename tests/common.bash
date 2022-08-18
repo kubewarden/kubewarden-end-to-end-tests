@@ -81,10 +81,6 @@ function apply_admission_policy {
 	wait_for_admission_policy PolicyUniquelyReachable
 }
 
-function kubectl_delete {
-	kubectl delete --ignore-not-found -f $1
-}
-
 function kubectl_delete_configmap_by_name {
 	kubectl -n $NAMESPACE delete --ignore-not-found configmap $1
 }
