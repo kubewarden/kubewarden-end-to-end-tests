@@ -16,10 +16,7 @@ teardown_file() {
 
 @test "[Namespaced AdmissionPolicy] Privileged pod in the default namespace (should fail)" {
 	# Launch privileged pod (should fail)
-	run kubectl run nginx-privileged --image=nginx:alpine --privileged
-	assert_failure
-	assert_output --regexp '^Error.*: admission webhook.*denied the request.*cannot schedule privileged containers$'
-	run ! kubectl get pods nginx-privileged
+	kubefail_privileged run nginx-privileged --image=nginx:alpine --privileged
 }
 
 @test "[Namespaced AdmissionPolicy] Privileged pod in the kubewarden namespace (should work)" {
@@ -43,10 +40,7 @@ teardown_file() {
 	kubectl run nginx-privileged --image=nginx:alpine --privileged
 
 	# I can not update privileged pods
-	run kubectl label pod nginx-privileged x=y
-	assert_failure
-	assert_output --regexp '^Error.*: admission webhook.*denied the request.*cannot schedule privileged containers$'
-
+	kubefail_privileged label pod nginx-privileged x=y
 	kubectl delete pod nginx-privileged
 }
 

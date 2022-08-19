@@ -31,8 +31,5 @@ teardown_file() {
 	kubectl wait --for=condition=Ready pod pause-unprivileged
 
 	# Launch privileged pod (should fail)
-	run kubectl run pause-privileged --image k8s.gcr.io/pause --privileged
-	assert_failure
-	assert_output --regexp '^Error.*: admission webhook.*denied the request.*cannot schedule privileged containers$'
-	run ! kubectl get pods pause-privileged
+	kubefail_privileged run pause-privileged --image k8s.gcr.io/pause --privileged
 }
