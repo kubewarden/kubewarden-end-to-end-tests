@@ -26,10 +26,7 @@ teardown_file() {
 	apply_cluster_admission_policy $RESOURCES_DIR/privileged-pod-policy.yaml
 
 	# Launch privileged pod (should fail)
-	run kubectl run nginx-privileged --image=nginx:alpine --privileged
-	assert_failure
-	assert_output --regexp '^Error.*: admission webhook.*denied the request.*cannot schedule privileged containers$'
-	run ! kubectl get pods nginx-privileged
+	kubefail_privileged run pod-privileged --image=k8s.gcr.io/pause --privileged
 }
 
 @test "[Monitor mode end-to-end tests] Transition from protect to monitor should be disallowed" {

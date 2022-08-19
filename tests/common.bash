@@ -56,6 +56,13 @@ function wait_cluster() {
     wait_pods
 }
 
+# Run kubectl action which should fail on pod privileged policy
+function kubefail_privileged {
+	run kubectl "$@"
+	assert_failure 1
+	assert_output --regexp '^Error.*: admission webhook.*denied the request.*cannot schedule privileged containers$'
+}
+
 function kubectl_apply_should_fail {
 	run kubectl apply -f $1
 	assert_failure
