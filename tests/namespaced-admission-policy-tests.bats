@@ -7,7 +7,7 @@ setup() {
 
 teardown_file() {
 	kubectl delete pods --all
-	kubectl delete -f $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
+	kubectl delete -f $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml --ignore-not-found
 }
 
 @test "[Namespaced AdmissionPolicy] Test AdmissionPolicy in default NS" {
