@@ -18,7 +18,7 @@ setup() {
 
 teardown() {
 	kubectl -n $NAMESPACE delete configmap $CONFIGMAP_NAME
-	kubectl delete -f $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
+	kubectl delete -f $RESOURCES_DIR/policy-pod-privileged.yaml
 }
 
 # Configure kubewarden to check policy signatures
@@ -52,7 +52,7 @@ function get_policy_server_status {
 	wait_rollout -n $NAMESPACE "deployment/policy-server-default"
 
 	# Policy Server should start fine
-	apply_admission_policy $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
+	apply_admission_policy $RESOURCES_DIR/policy-pod-privileged.yaml
 
 	# Check logs of last policyserver pod
 	run -0 get_policy_server_status
@@ -66,7 +66,7 @@ function get_policy_server_status {
 	create_configmap $RESOURCES_DIR/secure-supply-chain-cm-restricted.yaml
 
 	# Policy Server should start fine
-	kubectl apply -f $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
+	kubectl apply -f $RESOURCES_DIR/policy-pod-privileged.yaml
 
 	# Policy Server startup should fail
 	run kubectl -n $NAMESPACE rollout status --timeout=1m "deployment/policy-server-default"
