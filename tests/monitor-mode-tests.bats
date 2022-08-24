@@ -16,9 +16,10 @@ teardown_file() {
 
 @test "[Monitor mode end-to-end tests] Monitor mode should only log event" {
 	kubectl run nginx-privileged --image=nginx:alpine --privileged
-	default_policy_server_should_have_log_line "policy evaluation (monitor mode)"
-	default_policy_server_should_have_log_line "allowed: false"
-	default_policy_server_should_have_log_line "Privileged container is not allowed"
+	run kubectl logs -n $NAMESPACE -lapp="kubewarden-policy-server-default"
+	assert_output -p "policy evaluation (monitor mode)"
+	assert_output -p "allowed: false"
+	assert_output -p "Privileged container is not allowed"
 	kubectl delete pod nginx-privileged
 }
 

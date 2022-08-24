@@ -100,7 +100,3 @@ function wait_for_default_policy_server_rollout {
 	revision=$(kubectl -n $NAMESPACE get "deployment/policy-server-default" -o json | jq -r '.metadata.annotations."deployment.kubernetes.io/revision"')
 	wait_rollout -n $NAMESPACE --revision $revision "deployment/policy-server-default"
 }
-
-function default_policy_server_should_have_log_line {
-	kubectl logs -n $NAMESPACE -lapp="kubewarden-policy-server-default" | grep "$1"
-}
