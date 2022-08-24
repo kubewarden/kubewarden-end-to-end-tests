@@ -18,7 +18,7 @@ teardown_file() {
 	kubectl run nginx-privileged --image=nginx:alpine --privileged
 	default_policy_server_should_have_log_line "policy evaluation (monitor mode)"
 	default_policy_server_should_have_log_line "allowed: false"
-	default_policy_server_should_have_log_line "cannot schedule privileged containers"
+	default_policy_server_should_have_log_line "Privileged container is not allowed"
 	kubectl delete pod nginx-privileged
 }
 

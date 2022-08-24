@@ -4,7 +4,7 @@ metadata:
   name: privileged-pods
 spec:
   policyServer: default
-  module: registry://ghcr.io/kubewarden/tests/pod-privileged:v0.1.10
+  module: registry://ghcr.io/kubewarden/tests/pod-privileged:v0.2.1
   mode: monitor
   rules:
   - apiGroups: [""]

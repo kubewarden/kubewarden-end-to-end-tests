@@ -60,7 +60,7 @@ function wait_cluster() {
 function kubefail_privileged {
 	run kubectl "$@"
 	assert_failure 1
-	assert_output --regexp '^Error.*: admission webhook.*denied the request.*cannot schedule privileged containers$'
+	assert_output --regexp '^Error.*: admission webhook.*denied the request.*container is not allowed$'
 }
 
 function kubectl_apply_should_fail {
