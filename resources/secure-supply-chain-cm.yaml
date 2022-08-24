@@ -11,9 +11,12 @@
 ---
 apiVersion: v1
 allOf:
-  - kind: githubAction
-    owner: kubewarden
-    repo: ~
-    annotations: ~
+  - kind: pubKey
+    key: |
+      -----BEGIN PUBLIC KEY-----
+      MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQiTy5S+2JFvVlhUwWPLziM7iTM2j
+      byLgh2IjpNQN0Uio/9pZOTP/CsJmXoUNshfpTUHd3OxgHgz/6adtf2nBwQ==
+      -----END PUBLIC KEY-----
+    annotations:
+      env: prod
 anyOf: ~
-
