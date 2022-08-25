@@ -13,7 +13,7 @@ CONFIGMAP_NAME="ssc-verification-config"
 
 setup() {
 	load common.bash
-	wait_pods # -n kubewarden
+	wait_pods
 }
 
 teardown() {
