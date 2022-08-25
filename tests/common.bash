@@ -60,7 +60,7 @@ function wait_cluster() {
 function kubefail_privileged {
 	run kubectl "$@"
 	assert_failure 1
-	assert_output --regexp '^Error.*: admission webhook.*denied the request.*cannot schedule privileged containers$'
+	assert_output --regexp '^Error.*: admission webhook.*denied the request.*container is not allowed$'
 }
 
 function kubectl_apply_should_fail {
@@ -88,10 +88,6 @@ function apply_admission_policy {
 	wait_for_admission_policy PolicyUniquelyReachable
 }
 
-function kubectl_delete_configmap_by_name {
-	kubectl -n $NAMESPACE delete --ignore-not-found configmap $1
-}
-
 function wait_for_admission_policy {
 	wait_for --for=condition="$1" admissionpolicies --all -A
 }
@@ -103,18 +99,4 @@ function wait_for_cluster_admission_policy {
 function wait_for_default_policy_server_rollout {
 	revision=$(kubectl -n $NAMESPACE get "deployment/policy-server-default" -o json | jq -r '.metadata.annotations."deployment.kubernetes.io/revision"')
 	wait_rollout -n $NAMESPACE --revision $revision "deployment/policy-server-default"
-}
-
-function default_policy_server_rollout_should_fail {
-	revision=$(kubectl -n $NAMESPACE get "deployment/policy-server-default" -o json | jq -r '.metadata.annotations."deployment.kubernetes.io/revision"')
-	run kubectl -n $NAMESPACE rollout status --revision $revision "deployment/policy-server-default"
-	assert_failure
-}
-
-function default_policy_server_should_have_log_line {
-	kubectl logs -n $NAMESPACE -lapp="kubewarden-policy-server-default" | grep "$1"
-}
-
-function create_configmap_from_file_with_root_key {
-	kubectl -n $NAMESPACE create configmap $1 --from-file=$2=$3
 }

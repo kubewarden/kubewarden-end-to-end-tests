@@ -61,7 +61,7 @@ jobs:
           policy-server-container-image-artifact: ${{ inputs.policy-server-container-image-artifact }}
       - name: "Run all end-to-end tests"
         run: |
-          make --directory e2e-tests basic-e2e-test reconfiguration-test mutating-requests-test monitor-mode-test namespaced-admission-policy-test
+          make --directory e2e-tests basic-e2e-test reconfiguration-test mutating-requests-test monitor-mode-test namespaced-admission-policy-test secure-supply-chain-test
         shell: bash
         env:
           CLUSTER_CONTEXT: k3d-kubewarden-test-cluster #TODO get context from setup-kubewarden-cluster-action

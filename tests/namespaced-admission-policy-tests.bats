@@ -7,11 +7,11 @@ setup() {
 
 teardown_file() {
 	kubectl delete pods --all
-	kubectl delete -f $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml --ignore-not-found
+	kubectl delete -f $RESOURCES_DIR/policy-pod-privileged.yaml --ignore-not-found
 }
 
 @test "[Namespaced AdmissionPolicy] Test AdmissionPolicy in default NS" {
-	apply_admission_policy $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
+	apply_admission_policy $RESOURCES_DIR/policy-pod-privileged.yaml
 
 	# Privileged pod in the default namespace (should fail)
 	kubefail_privileged run nginx-privileged --image=nginx:alpine --privileged
@@ -28,7 +28,7 @@ teardown_file() {
 }
 
 @test  "[Namespaced AdmissionPolicy] Update policy to check only UPDATE operations" {
-	yq '.spec.rules[0].operations = ["UPDATE"]' resources/namespaced-privileged-pod-policy.yaml | kubectl apply -f -
+	yq '.spec.rules[0].operations = ["UPDATE"]' $RESOURCES_DIR/policy-pod-privileged.yaml | kubectl apply -f -
 
 	# I can create privileged pods now
 	kubectl run nginx-privileged --image=nginx:alpine --privileged
@@ -39,7 +39,7 @@ teardown_file() {
 }
 
 @test "[Namespaced AdmissionPolicy] Delete AdmissionPolicy to check restrictions are removed" {
-	kubectl delete -f $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
+	kubectl delete -f $RESOURCES_DIR/policy-pod-privileged.yaml
 
 	# I can create privileged pods
 	kubectl run nginx-privileged --image=nginx:alpine --privileged

@@ -61,7 +61,7 @@ setup() {
 }
 
 @test "[CRD upgrade] Try to install a object with a old CRD version" {
-	apply_admission_policy $RESOURCES_DIR/namespaced-privileged-pod-policy.yaml
+	apply_admission_policy $RESOURCES_DIR/policy-pod-privileged.yaml
 	crd_version=$(kubectl --context $CLUSTER_CONTEXT get admissionPolicy -o json | jq -r ".items[].apiVersion" | uniq)
 	[ "$crd_version" = "policies.kubewarden.io/v1" ]
 }
