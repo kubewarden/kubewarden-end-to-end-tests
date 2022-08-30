@@ -5,70 +5,54 @@ setup() {
 	wait_pods
 }
 
-@test "[CRD upgrade] Install old Kubewarden version" {
-	helm install --wait \
-		--namespace $NAMESPACE --create-namespace \
-		--version "$KUBEWARDEN_CRDS_CHART_OLD_VERSION" \
-		kubewarden-crds $KUBEWARDEN_CHARTS_LOCATION/kubewarden-crds
-
-	helm install --wait --namespace $NAMESPACE  \
-		--values $RESOURCES_DIR/default-kubewarden-controller-values.yaml \
-		--version "$KUBEWARDEN_CONTROLLER_CHART_OLD_VERSION" \
-		kubewarden-controller $KUBEWARDEN_CHARTS_LOCATION/kubewarden-controller
-
-	yq --in-place -Y ".recommendedPolicies.enabled=true" $RESOURCES_DIR/default-kubewarden-defaults-values.yaml
-	yq --in-place -Y ".recommendedPolicies.defaultPolicyMode=\"protect\"" $RESOURCES_DIR/default-kubewarden-defaults-values.yaml
-
-	helm install --wait --namespace $NAMESPACE \
-		--values $RESOURCES_DIR/default-kubewarden-defaults-values.yaml \
-		--version "$KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION" \
-		kubewarden-defaults $KUBEWARDEN_CHARTS_LOCATION/kubewarden-defaults
-
-	crd_version=$(kubectl --context $CLUSTER_CONTEXT get clusteradmissionpolicy -o json | jq -r ".items[].apiVersion" | uniq)
-	[ "$crd_version" = "policies.kubewarden.io/v1alpha2" ]
-	wait_for_cluster_admission_policy PolicyUniquelyReachable
+function helm_in {
+    helm upgrade --install --wait --namespace $NAMESPACE --create-namespace \
+        "${@:2}" $1 $KUBEWARDEN_CHARTS_LOCATION/$1
 }
 
-@test "[CRD upgrade] Launch a privileged pod should fail" {
-	kubectl_apply_should_fail $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+# check_apiversion admissionpolicies v1
+function check_apiversion {
+    run -0 bash -c "kubectl get $1 -o json | jq -er '.items[].apiVersion' | uniq"
+    assert_output "policies.kubewarden.io/$2"
 }
 
-@test "[CRD upgrade] Upgrade CRDs" {
-	helm upgrade --wait \
-		--namespace $NAMESPACE --create-namespace \
-		--version $KUBEWARDEN_CRDS_CHART_VERSION \
-		kubewarden-crds $KUBEWARDEN_CHARTS_LOCATION/kubewarden-crds
+function check_default_policies {
+    # Check all policies are in v1
+    check_apiversion clusteradmissionpolicies v1
+    wait_for_cluster_admission_policy PolicyUniquelyReachable
 
-	helm upgrade --wait --namespace $NAMESPACE \
-		--values $RESOURCES_DIR/default-kubewarden-controller-values.yaml \
-		--version $KUBEWARDEN_CONTROLLER_CHART_VERSION \
-		kubewarden-controller $KUBEWARDEN_CHARTS_LOCATION/kubewarden-controller
-
-	yq --in-place -Y ".recommendedPolicies.enabled=true" $RESOURCES_DIR/default-kubewarden-defaults-values.yaml
-	yq --in-place -Y ".recommendedPolicies.defaultPolicyMode=\"protect\"" $RESOURCES_DIR/default-kubewarden-defaults-values.yaml
-	helm upgrade --wait --namespace $NAMESPACE \
-		--values $RESOURCES_DIR/default-kubewarden-defaults-values.yaml \
-		--version $KUBEWARDEN_DEFAULTS_CHART_VERSION \
-		kubewarden-defaults $KUBEWARDEN_CHARTS_LOCATION/kubewarden-defaults
-
-	crd_version=$(kubectl --context $CLUSTER_CONTEXT get clusteradmissionpolicy -o json | jq -r ".items[].apiVersion" | uniq)
-	[ "$crd_version" = "policies.kubewarden.io/v1" ]
-	wait_for_cluster_admission_policy PolicyUniquelyReachable
+    # Run privileged pod (should fail)
+    # kubefail_privileged run pod-privileged --image=k8s.gcr.io/pause --privileged
+    # Workaround - https://suse.slack.com/archives/C02DBSK7HC1/p1661518752112929
+    run -1 kubectl run pod-privileged --image=k8s.gcr.io/pause --privileged
 }
 
-@test "[CRD upgrade] Launch a privileged pod should fail after CRD upgrade" {
-	kubectl_apply_should_fail $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+
+@test "[CRD upgrade] Install old Kubewarden" {
+    # Install old kubewarden version
+    helm_in kubewarden-crds --version $KUBEWARDEN_CRDS_CHART_OLD_VERSION
+    helm_in kubewarden-controller --version $KUBEWARDEN_CONTROLLER_CHART_OLD_VERSION
+    helm_in kubewarden-defaults --version $KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION \
+        --set recommendedPolicies.enabled=True \
+        --set recommendedPolicies.defaultPolicyMode=protect
+    check_default_policies
 }
 
-@test "[CRD upgrade] Try to install a object with a old CRD version" {
-	apply_admission_policy $RESOURCES_DIR/policy-pod-privileged.yaml
-	crd_version=$(kubectl --context $CLUSTER_CONTEXT get admissionPolicy -o json | jq -r ".items[].apiVersion" | uniq)
-	[ "$crd_version" = "policies.kubewarden.io/v1" ]
+@test "[CRD upgrade] Upgrade Kubewarden" {
+    helm_in kubewarden-crds --version $KUBEWARDEN_CRDS_CHART_VERSION
+    helm_in kubewarden-controller --version $KUBEWARDEN_CONTROLLER_CHART_VERSION
+    helm_in kubewarden-defaults --version $KUBEWARDEN_DEFAULTS_CHART_VERSION
+    check_default_policies
 }
 
-@test "[CRD upgrade] Privileged pod should be launched after delete old policies" {
-	kubectl delete --wait --ignore-not-found -n kubewarden clusteradmissionpolicies --all
-	kubectl create namespace testns
-	kubectl --namespace testns apply --wait -f $RESOURCES_DIR/violate-privileged-pod-policy.yaml
+@test "[CRD upgrade] Check old policy CRD version is translated to new" {
+	sed '/apiVersion:/ s#/v1.*#/v1alpha2#' $RESOURCES_DIR/policy-pod-privileged.yaml | apply_admission_policy
+	check_apiversion admissionPolicy v1
+	kubectl delete -f $RESOURCES_DIR/policy-pod-privileged.yaml
 }
 
+@test "[CRD upgrade] Disable default policies & run privileged pod" {
+	helm_in kubewarden-defaults --set recommendedPolicies.enabled=False
+	wait_rollout -n $NAMESPACE "deployment/policy-server-default"
+	kubectl run pod-privileged --image=k8s.gcr.io/pause --privileged
+}
