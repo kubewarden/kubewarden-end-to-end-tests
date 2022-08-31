@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
 RESOURCES_DIR=$1
 CRD_VERSION=$2
