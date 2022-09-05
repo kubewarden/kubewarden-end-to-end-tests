@@ -112,9 +112,7 @@ $(TESTS)::
 .PHONY: tests
 tests: $(filter-out upgrade.bats, $(TESTS))
 
-.PHONY: prepare cluster install reinstall clean
-prepare: 
-	curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
+.PHONY: cluster install reinstall clean
 
 cluster:
 	k3d cluster create $(CLUSTER_NAME) -s 1 -a 1 --wait --timeout $(TIMEOUT) -v /dev/mapper:/dev/mapper
