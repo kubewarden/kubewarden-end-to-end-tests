@@ -9,56 +9,64 @@ like yaml files to deploy Kubernetes resources.
 
 ## Requirements
 
-Most of the tests are written using [bats](https://github.com/bats-core/bats-core).
-The version used is v1.5.0. So, it's necessary install it in your environment.
+Tests are written using [bats](https://github.com/bats-core/bats-core).
+The minimal required version is v1.5.0. So, it's necessary install it in your environment.
 For that, you can check your OS packages repositories or follow the [official documentation](https://bats-core.readthedocs.io/en/stable/installation.html#installation).
 
-Other dependencies can be install with the following command:
+Other required dependencies:
 
-```console
-make setup
+```bash
+# k3d
+curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+
+# yq - python yq has different syntax then mikefarah binary
+pip3 install yq
+
+# Also kubectl, helm, docker, ...
 ```
+
+## Setting up cluster & kubewarden
+
+The Makefile has many targets to make easier to setup a test environment and
+run the tasks:
+
+```bash
+make clean   # to remove previous k3d cluster
+make cluster # to create new k3d cluster
+make install # to install kubewarden (and cert-manager)
+
+# or you can group 3 steps above into
+make reinstall
+
+# Optionally you can specify versions, see top of the Makefile for options
+KUBEWARDEN_CONTROLLER_CHART_VERSION=0.3.2 make install
+```
+
 
 ## Running the tests
 
-The Makefile has many targets to make easier to setup a test environment and
-running the tasks. You can start a K3D cluster to run your tests:
-
-```console
-make create-k8s-cluster
-```
-
-Install a given Kubewarden version:
-
-```
-make install-kubewarden
-```
-
-If you want to install a chart version different from the default one, you can
-overwrite the `KUBEWARDEN_CONTROLLER_CHART_VERSION` variable:
-
-```console
-KUBEWARDEN_CONTROLLER_CHART_VERSION=0.3.2 make install-kubewarden
-```
-
 Once you have a cluster with Kubewarden install, you can run the basic
-e2e tests:
+e2e tests.
 
-```console
-make basic-e2e-test
+```bash
+# All non-destructive tests have target auto-generated from filename
+make monitor-mode-tests.bats reconfiguration-tests.bats
+
+# There is also a target that groups all of them
+make tests
+
+# Upgrade tests is special since it reinstalls cluster
+# It does not require cluster & kubewarden setup steps
+make upgrade.bats
+
 ```
 
-You can also run the reconfiguration tests:
-
-```console
-make reconfiguration-test
-```
 
 All the tests run on a given `kubectl` context. Thus, if you want to run the
 tests on a cluster already in place, you need to define the context:
 
 ```console
-CLUSTER_CONTEXT=k3d-mycluster make basic-e2e-test
+CLUSTER_CONTEXT=k3d-mycluster make basic-end-to-end-test.bats
 ```
 
 Also check the Kubewarden controller repository to see how run this test in a [Github
