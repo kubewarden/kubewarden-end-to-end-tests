@@ -84,7 +84,7 @@ define install-cert-manager =
 endef
 
 define generate-versioned-resources-dir =
-	./scripts/generate_resources_dir.sh $(ROOT_RESOURCES_DIR) $(CRD_VERSION) $(CRD_VERSION_SUFFIX)
+	./scripts/generate_resources_dir.sh $(ROOT_RESOURCES_DIR) $(CRD_VERSION)
 endef
 
 # ==================================================================================================

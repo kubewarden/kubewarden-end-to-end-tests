@@ -1,17 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RESOURCES_DIR=$1
-CRD_VERSION=$2
-CRD_SUFFIX=$3
+CRD=$2
+SOURCEDIR="$1"
+TARGETDIR="$1/resources_${CRD#*/}"
 
-rm -r $RESOURCES_DIR/resources_$CRD_SUFFIX
-mkdir $RESOURCES_DIR/resources_$CRD_SUFFIX
+# Copy files to versioned directory
+mkdir -p $TARGETDIR
+cp -a $SOURCEDIR/*.yaml $TARGETDIR
 
-find $RESOURCES_DIR -maxdepth 1 -type f  -exec cp \{\}  $RESOURCES_DIR/resources_$CRD_SUFFIX \;
-
-kubewarden_resources_files=$(grep -rl "apiVersion: policies.kubewarden.io" $RESOURCES_DIR/resources_$CRD_SUFFIX)
-for file in $kubewarden_resources_files 
-do 
-	yq --in-place -Y ".apiVersion =\"$CRD_VERSION\"" $file
-done
+# Replace policies apiVersion with $CRD
+grep -rlZ "apiVersion: policies.kubewarden.io" $TARGETDIR | xargs -0 \
+	 yq -i -Y --arg c $CRD '.apiVersion = $c'
