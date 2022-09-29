@@ -16,24 +16,13 @@ setup() {
 	wait_pods
 }
 
-teardown() {
-	kubectl -n $NAMESPACE delete configmap $CONFIGMAP_NAME
-	kubectl delete -f $RESOURCES_DIR/policy-pod-privileged.yaml
-}
-
-# Configure kubewarden to check policy signatures
-# https://docs.kubewarden.io/distributing-policies/secure-supply-chain#configuring-the-policy-server-to-check-policy-signatures
-setup_file() {
-	helm upgrade -n kubewarden --set policyServer.verificationConfig=$CONFIGMAP_NAME --wait kubewarden-defaults kubewarden/kubewarden-defaults
-	kubectl get policyserver default -o json | jq -e --arg cmname $CONFIGMAP_NAME '.spec.verificationConfig == $cmname'
-	# don't wait for rollout here, it needs configmap to run
-}
-
 teardown_file() {
 	helm upgrade -n kubewarden --set policyServer.verificationConfig="" --wait kubewarden-defaults kubewarden/kubewarden-defaults
+	kubectl delete configmap -n $NAMESPACE $CONFIGMAP_NAME --ignore-not-found
 }
 
 function create_configmap {
+	kubectl -n $NAMESPACE delete configmap $CONFIGMAP_NAME --ignore-not-found
 	kubectl -n $NAMESPACE create configmap $CONFIGMAP_NAME --from-file=verification-config=$1
 }
 
@@ -47,9 +36,17 @@ function get_policy_server_status {
 	kubectl get pod -n kubewarden $podname -o json | jq -e '.status.containerStatuses[0].ready == true'
 }
 
+# Configure kubewarden to check policy signatures
+# https://docs.kubewarden.io/distributing-policies/secure-supply-chain#configuring-the-policy-server-to-check-policy-signatures
+@test "[Secure Supply Chain tests] Enable" {
+	# policyserver needs configmap to start in verification mode
+	create_configmap <(kwctl scaffold verification-config)
+	helm_in kubewarden-defaults --set policyServer.verificationConfig=$CONFIGMAP_NAME
+	kubectl get policyserver default -o json | jq -e --arg cmname $CONFIGMAP_NAME '.spec.verificationConfig == $cmname'
+}
+
 @test "[Secure Supply Chain tests] Trusted policy should not block policy server" {
 	create_configmap $RESOURCES_DIR/secure-supply-chain-cm.yaml
-	wait_rollout -n $NAMESPACE "deployment/policy-server-default"
 
 	# Policy Server should start fine
 	apply_admission_policy $RESOURCES_DIR/policy-pod-privileged.yaml
@@ -59,16 +56,14 @@ function get_policy_server_status {
 	assert_output -p 'verifying policy authenticity and integrity using sigstore'
 	assert_output -p 'Local file checksum verification passed'
 
-	# Cleanup moved to teardown
+	kubectl delete -f $RESOURCES_DIR/policy-pod-privileged.yaml
 }
 
 @test "[Secure Supply Chain tests] Untrusted policy should block policy server to run" {
 	create_configmap $RESOURCES_DIR/secure-supply-chain-cm-restricted.yaml
 
-	# Policy Server should start fine
-	kubectl apply -f $RESOURCES_DIR/policy-pod-privileged.yaml
-
 	# Policy Server startup should fail
+	kubectl apply -f $RESOURCES_DIR/policy-pod-privileged.yaml
 	run kubectl -n $NAMESPACE rollout status --timeout=1m "deployment/policy-server-default"
 	assert_failure 1
 
@@ -77,5 +72,5 @@ function get_policy_server_status {
 	assert_output -p 'Annotation not satisfied'
 	assert_output -p 'policy cannot be verified'
 
-	# Cleanup moved to teardown
+	kubectl delete -f $RESOURCES_DIR/policy-pod-privileged.yaml
 }
