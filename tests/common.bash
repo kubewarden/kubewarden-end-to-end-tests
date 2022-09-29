@@ -13,6 +13,15 @@ function helm() {
 	command helm --kube-context $CLUSTER_CONTEXT "$@"
 }
 
+function helm_in {
+    helm upgrade --install --wait --namespace $NAMESPACE --create-namespace \
+        "${@:2}" $1 $KUBEWARDEN_CHARTS_LOCATION/$1
+
+    # kubewarden-defaults ignore wait param
+    [ $1 = 'kubewarden-defaults' ] && retry "kubectl rollout status -n kubewarden deployment/policy-server-default"
+    return 0
+}
+
 function retry() {
     local cmd=$1
     local tries=${2:-10}
