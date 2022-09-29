@@ -18,7 +18,7 @@ function helm_in {
         "${@:2}" $1 $KUBEWARDEN_CHARTS_LOCATION/$1
 
     # kubewarden-defaults ignore wait param
-    [ $1 = 'kubewarden-defaults' ] && retry "kubectl rollout status -n kubewarden deployment/policy-server-default"
+    [ $1 = 'kubewarden-defaults' ] && retry "kubectl --context $CLUSTER_CONTEXT rollout status -n kubewarden deployment/policy-server-default"
     return 0
 }
 
