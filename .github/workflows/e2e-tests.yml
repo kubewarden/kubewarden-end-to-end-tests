@@ -70,3 +70,5 @@ jobs:
           # TODO - share release with the create-kubewarden-cluster action
           helm uninstall -n kubewarden kubewarden-controller
           helm uninstall -n kubewarden kubewarden-crds
+        env:
+          HELM_KUBECONTEXT: k3d-kubewarden-test-cluster
