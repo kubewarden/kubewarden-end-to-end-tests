@@ -17,7 +17,8 @@ function helm_in {
     helm upgrade --install --wait --namespace $NAMESPACE --create-namespace \
         "${@:2}" $1 $KUBEWARDEN_CHARTS_LOCATION/$1
 
-    # kubewarden-defaults ignore wait param
+    # kubewarden-defaults ignore wait param, so rollout status would fail without retry (does not exist yet)
+    # retry function requires full command, not a function
     [ $1 = 'kubewarden-defaults' ] && retry "kubectl --context $CLUSTER_CONTEXT rollout status -n kubewarden deployment/policy-server-default"
     return 0
 }
