@@ -2,7 +2,7 @@
 
 setup() {
 	load common.bash
-	wait_pods -n kubewarden
+	wait_pods
 }
 
 teardown_file() {

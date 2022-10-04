@@ -2,18 +2,18 @@
 
 setup() {
 	load common.bash
-	wait_pods
+	wait_pods -n kube-system
 }
 
-function helm_in {
-    helm upgrade --install --wait --namespace $NAMESPACE --create-namespace \
-        "${@:2}" $1 $KUBEWARDEN_CHARTS_LOCATION/$1
+# helper function to allow run + pipe
+function get_apiversion() {
+    kubectl get $1 -o json | jq -er '.items[].apiVersion' | uniq
 }
 
 # check_apiversion admissionpolicies v1
 function check_apiversion {
-    run -0 bash -c "kubectl get $1 -o json | jq -er '.items[].apiVersion' | uniq"
-    assert_output "policies.kubewarden.io/$2"
+	run -0 get_apiversion $1
+	assert_output "policies.kubewarden.io/$2"
 }
 
 function check_default_policies {

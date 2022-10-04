@@ -13,6 +13,16 @@ function helm() {
 	command helm --kube-context $CLUSTER_CONTEXT "$@"
 }
 
+function helm_in {
+    helm upgrade --install --wait --namespace $NAMESPACE --create-namespace \
+        "${@:2}" $1 $KUBEWARDEN_CHARTS_LOCATION/$1
+
+    # kubewarden-defaults ignore wait param, so rollout status would fail without retry (does not exist yet)
+    # retry function requires full command, not a function
+    [ $1 = 'kubewarden-defaults' ] && retry "kubectl --context $CLUSTER_CONTEXT rollout status -n kubewarden deployment/policy-server-default"
+    return 0
+}
+
 function retry() {
     local cmd=$1
     local tries=${2:-10}
@@ -28,10 +38,10 @@ function retry() {
 # Handles kube-api disconnects during upgrade
 function wait_pods() {
     local i output
-    for i in {1..90}; do
-        output=$(kubectl get pods --no-headers -o wide ${@:--n kube-system} | grep -vw Completed || echo 'Fail')
+    for i in {1..20}; do
+        output=$(kubectl get pods --no-headers -o wide ${@:--n kubewarden} | grep -vw Completed || echo 'Fail')
         grep -vE '([0-9]+)/\1 +Running' <<< $output || break
-        [ $i -ne 6 ] && sleep 30 || { echo "Godot: pods not running"; false; }
+        [ $i -ne 20 ] && sleep 30 || { echo "Godot: pods not running"; false; }
     done
 }
 
@@ -39,10 +49,10 @@ function wait_pods() {
 # Handles kube-api disconnects during upgrade
 function wait_nodes() {
     local i output
-    for i in {1..30}; do
+    for i in {1..20}; do
         output=$(kubectl get nodes --no-headers ${@:-} || echo 'Fail')
         grep -vE '\bReady\b' <<< $output || break
-        [ $i -ne 6 ] && sleep 30 || { echo "Godot: nodes not running"; false; }
+        [ $i -ne 20 ] && sleep 30 || { echo "Godot: nodes not running"; false; }
     done
 }
 
