@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-bats_require_minimum_version 1.5.0
+bats_require_minimum_version 1.7.0
 
 load "../helpers/bats-support/load.bash"
 load "../helpers/bats-assert/load.bash"
