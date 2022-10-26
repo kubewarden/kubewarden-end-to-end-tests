@@ -71,3 +71,12 @@ jobs:
           helm uninstall -n kubewarden kubewarden-controller kubewarden-crds kubewarden-defaults
         env:
           HELM_KUBECONTEXT: k3d-kubewarden-test-cluster
+      - name: Notify on failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: localhost
+          subject: Kubewarden E2E job failed!
+          to: ${{ secrets.EMAIL_ADDRESS }}
+          from: Github Actions Bot
+          body: E2E test ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} failed!
