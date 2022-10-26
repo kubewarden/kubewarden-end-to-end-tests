@@ -51,7 +51,7 @@ jobs:
         with:
           bats-version: 1.7.0
       - name: "Create Kubernetes cluster with Kubewarden installed"
-        uses: kubewarden/setup-kubewarden-cluster-action@v1.1.0
+        uses: kubewarden/github-actions/setup-kubewarden-cluster-action@v1
         with:
           controller-image-repository: ${{ inputs.controller-image-repository }}
           controller-image-tag: ${{ inputs.controller-image-tag }}
