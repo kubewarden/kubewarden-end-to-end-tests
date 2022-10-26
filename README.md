@@ -9,6 +9,12 @@ like yaml files to deploy Kubernetes resources.
 
 ## Requirements
 
+> **Note:** this repository makes use of git submodules. Ensure you run the following
+> command:
+> ```console
+> git submodule update --int
+> ```
+
 Tests are written using [bats](https://github.com/bats-core/bats-core).
 The minimal required version is v1.7.0. So, it's necessary install it in your environment.
 For that, you can check your OS packages repositories or follow the [official documentation](https://bats-core.readthedocs.io/en/stable/installation.html#installation).
