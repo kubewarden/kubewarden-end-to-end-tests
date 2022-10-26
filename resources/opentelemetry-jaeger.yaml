@@ -1,0 +1,10 @@
+apiVersion: jaegertracing.io/v1
+kind: Jaeger
+metadata:
+  name: my-open-telemetry
+  namespace: jaeger
+spec:
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: nginx
