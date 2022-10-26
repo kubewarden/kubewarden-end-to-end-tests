@@ -30,7 +30,7 @@ KUBEWARDEN_CRDS_CHART_RELEASE ?= kubewarden-crds
 KUBEWARDEN_DEFAULTS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json --devel | jq -r ".[0].version")
 KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json --devel | jq -r ".[1].version")
 KUBEWARDEN_DEFAULTS_CHART_RELEASE ?= kubewarden-defaults
-CERT_MANAGER_VERSION ?= v1.5.3
+CERT_MANAGER_VERSION ?= v1.9.1
 #
 # CRD version to be tested
 CRD_VERSION ?= $(shell helm show values $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --version $(KUBEWARDEN_DEFAULTS_CHART_VERSION) | yq -r ".crdVersion")
@@ -89,14 +89,6 @@ endef
 
 # ==================================================================================================
 # Targets
-
-.PHONY: install-opentelemetry delete-opentelemetry
-install-opentelemetry:
-	$(kube) apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/opentelemetry-operator.yaml
-	$(kube) wait --for=condition=Available deployment --timeout=$(TIMEOUT) -n opentelemetry-operator-system --all
-
-delete-opentelemetry:
-	$(kube) delete -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/opentelemetry-operator.yaml
 
 # Upgrade test requires new cluster
 upgrade.bats:: clean cluster
