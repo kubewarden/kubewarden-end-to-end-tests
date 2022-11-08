@@ -59,15 +59,16 @@ jobs:
           policy-server-repository: ${{ inputs.policy-server-repository }}
           policy-server-tag: ${{ inputs.policy-server-tag }}
           policy-server-container-image-artifact: ${{ inputs.policy-server-container-image-artifact }}
+          cluster-name: ${{ github.repository_owner }}-ghactions-cluster
       - name: "Run all end-to-end tests"
         run: |
           make --directory e2e-tests tests upgrade.bats
         shell: bash
         env:
-          CLUSTER_CONTEXT: k3d-kubewarden-test-cluster #TODO get context from setup-kubewarden-cluster-action
+          CLUSTER_CONTEXT: k3d-${{ github.repository_owner }}-ghactions-cluster #TODO get context from setup-kubewarden-cluster-action
       - name: "Uninstall Kuberwarden"
         run: |
           # TODO - share release with the create-kubewarden-cluster action
           helm uninstall -n kubewarden kubewarden-controller kubewarden-crds kubewarden-defaults
         env:
-          HELM_KUBECONTEXT: k3d-kubewarden-test-cluster
+          HELM_KUBECONTEXT: k3d-${{ github.repository_owner }}-ghactions-cluster
