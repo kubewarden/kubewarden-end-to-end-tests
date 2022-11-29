@@ -21,7 +21,7 @@ function run() {
         shift
     fi
     status=0
-    output=$(kubectl "$@" 2>&1 | tee -a $OUTPUT) || status=$?
+    output=$(eval "$@" 2>&1 | tee -a $OUTPUT) || status=$?
     [ $status -eq $status_req ]
 }
 
