@@ -1,0 +1,15 @@
+apiVersion: policies.kubewarden.io/v1alpha2
+kind: AdmissionPolicy
+metadata:
+  name: pod-privileged
+spec:
+  policyServer: default
+  module: registry://ghcr.io/kubewarden/tests/pod-privileged:v0.2.1
+  rules:
+  - apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
+    operations:
+    - CREATE
+    - UPDATE
+  mutating: false

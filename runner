@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+#
+# Wrapper for validator to run in docker
+#
+# v build                       # build docker image
+# v run  -n 1:2 -k              # create new cluster
+# v run cluster_xxx             # run interactive shell
+# v run cluster_xxx -t base     # test existing cluster
+# v clean                       # clean docker containers & images (cluster-XXX scope)
+
+set -eEuo pipefail
+trap 'echo "Error: $(sed -n "$LINENO s/^\s*//p" $BASH_SOURCE)"' ERR
+
+# v build [tag]
+do_build() {
+    target=${1:-run}
+    docker build -t validator:$target  --no-cache \
+        --build-arg DOCKER_GID=$(getent group docker | cut -d: -f3) \
+        --build-arg USER=$(id -un) --build-arg UID=$(id -u)  ${@:1} .
+}
+
+# v run [-e INCIDENT=XXX -e UPGRADE=before -e controller_image=1.2.2 -t none -k ...]
+do_run() {
+    [[ $@ =~ ^[a-z] ]] && { target=$1; shift; }
+    docker run --cgroupns=host --net=host -it -v /var/run/docker.sock:/var/run/docker.sock \
+        -v $PWD:/app validator:${target:-run} $@
+}
+
+# v cluster_xxx [ -t helm ]
+do_run_entrypoint() {
+    cluster_dir="${1%/}"
+    cluster_img="validator:$cluster_dir"
+    test -d "${cluster_dir##*/}"
+
+    # Commit initial image if needed
+    if [ -z "$(docker image ls -q $cluster_img)" ]; then
+        container_id=$(grep '^CONTAINER_ID=' "$cluster_dir/logs/environment.log" | cut -d= -f2- | tail -1)
+        echo "Commit container: $container_id"
+        docker commit $container_id $cluster_img > /dev/null
+    fi
+
+    # Run interactive shell or custom command
+    [ $# -eq 1 ] && params="-t 00_entrypoint.sh" || params="${@:2}"
+    docker run --cgroupns=host --net=host -it -v /var/run/docker.sock:/var/run/docker.sock \
+        -v $PWD:/app $cluster_img -j $cluster_dir $params ||:
+}
+
+do_cleanup() {
+    docker container prune -f
+    docker image prune -f
+    cluster_ids=$(docker images validator:cluster-* -q | paste -sd' ')
+    [ -n "$cluster_ids" ] && docker rmi $cluster_ids
+}
+
+case ${1:-list} in
+    list)
+        ls -d cluster-??? &> /dev/null && ./validator -r || echo "No cluster found.";;
+    build)
+        do_build ${@:2};;
+    run)
+        do_run ${@:2};;
+    cluster-???)
+        do_run_entrypoint $@;;
+    clean)
+        do_cleanup
+        ;;
+    *)
+        echo "Unknown command: $1";;
+esac
+

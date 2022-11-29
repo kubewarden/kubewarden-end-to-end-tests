@@ -1,0 +1,243 @@
+#!/usr/bin/env bash
+set -aeEuo pipefail
+
+# If some magic fails
+# - problem with aliases in ENV setup?
+# - broken pipe with grep -qm, tail?
+
+usage() {
+    echo "Usage: $0 [ -p <platform> | -j <json_file|cluster-dir> ] [ -t <test> -n m:w -k -K ] [ -r -R ]
+        -p Platform to be tested: k3d
+        -j Path to cluster.json file or cluster-XXX directory
+           This option will skip deployment and use existing cluster
+        -t Testsuite to execute:
+           none: only create cluster
+           #smoke: install kubewarden
+           #base: run base cluster tests
+           #full: run also time-consuming cluster tests
+           <test>: run selected test from TESTDIR
+        -n Use master:worker count for deployment
+        -k Keep cluster, don't run destroy scripts
+        -K Keep cluster only if something fails
+        -r Show results for tested clusters. Capital R will destroy all active deployments
+        -e Set extra variables -e name=[value] -e ...
+
+        Examples:
+        Deploy cluster with 2 workers on k3d, install kubewarden, destroy cluster
+         - $0 -t kubewarden -n 1:2
+
+        Use existing cluster and run bootstrap & join & base tests on it, don't destroy
+         - $0 -j cluster-xyz -t kubewarden -k
+
+        If SUFFIX=<user> if set it will overwrite <whoami> default - it you need multiple clusters
+
+        To see what's happening: tail cluster-XXX/logs/console.log or -e OUTPUT=/dev/stdout
+        Good Luck." 1>&2
+    exit 1
+}
+
+# ==================================================================================================
+# REQUIRED VARS & ENV setup
+[ -f env.conf ] && source env.conf
+
+: ${SUFFIX:=$(whoami)}
+: ${BASEDIR:=$PWD}
+: ${LIBDIR:=$BASEDIR/lib}
+: ${TESTDIR:=$BASEDIR/tests}
+: ${DATADIR:=$BASEDIR/data}
+: ${PLATFORM:=k3d}
+: ${TESTSUITE:=join}
+: ${MASTER_COUNT:=1}
+: ${WORKER_COUNT:=1}
+
+shopt -s expand_aliases
+ssh_opts='-o BatchMode=yes -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o LogLevel=error -o ConnectTimeout=30'
+alias ssh="ssh $ssh_opts"
+alias scp="scp $ssh_opts"
+alias curl="curl --silent --create-dirs"
+
+# ==================================================================================================
+# Logging & Functions & Traps
+exec 3>&1     # keep logs on stdout after redirection
+: ${OUTPUT:=} # don't print twice if output=stdout
+log  () { printf -- "$(date +%R) \e[${1}m${*:2}\e[0m\n" | tee -a ${OUTPUT/\/dev\/stdout} ${REPORT:-} >&3; }
+step () { log 32 "${*}" $(basename "${BASH_SOURCE[1]/${BASH_SOURCE}}" | sed 's/.\+/[&]/'); } # print test module
+info () { log 0  "  ${*}"; }
+warn () { log 33 "  ${*}"; }
+error() { log 31 "  ${*}"; }
+
+in_container() { grep -qE 'docker|crio|lxc' /proc/1/cgroup || return $?; }
+
+setup_container() {
+    eval "$(ssh-agent -s)"
+    chmod 600 ${DATADIR}/id_shared
+    ssh-add ${DATADIR}/id_shared
+    mkdir -p ~/.ssh
+    cp -n $DATADIR/container_ssh_config ~/.ssh/config
+}
+
+list_clusters() {
+    ls -d cluster-??? > /dev/null # Check if cluster exists
+    # Birth time if available, otherwise modification time
+    [ $(stat -c %W .) -ne 0 ] && fmt='W' || fmt='Y'
+    for d in $(stat -c "%$fmt %n" cluster-??? | sort -rnk1 | cut -d' ' -f2); do
+        stdlog="$d/logs/report"
+        [ -f $stdlog ] || continue
+        platform=$(grep -Eosm1 '(Platform|Deploy):? (k3d|vmware)' $stdlog ||:)
+        size=$(sed -rn '/Masters|Workers/ s/.*: //p' $stdlog | awk 'NR <= 2 {print NF}' | paste -sd:)
+        suff=$(grep -m1 '###' $stdlog | awk '{print $(NF-1)}')
+
+        grep -sq "$d.*PASSED" $stdlog && result='✓' || result='?'
+        grep -sq "$d.*FAILED" $stdlog && result='x'
+        [ $(grep -soE "$d.*(PASSED|FAILED)" $stdlog | uniq | wc -l) -gt 1 ] && result='±'
+        CLUSTERID=$d source "$TESTDIR/cluster_$PLATFORM.sh" status && result="\e[5m$result\e[0m"
+
+        printf "%(%F %R)T: $d [$result] ${platform#* } $size $suff" $(stat -c"%$fmt" $d)
+        if [ "${1:-}" = 'rm' ] && [[ "$result" =~ '\e[5m' ]]; then
+            printf ": destroying\n"
+            CLUSTERID=$d source "$TESTDIR/cluster_$PLATFORM.sh" delete >/dev/null
+        else
+            printf "\n"
+        fi
+    done
+    exit 0
+}
+
+trap_exit() {
+    status=$?
+
+    [ $status -ne 0 -a -v PRESERVE_ON_FAILURE ] && PRESERVE=1
+    [ $status -ne 0 -a -f "${OUTPUT:-none}" ] && tail -20 "$OUTPUT" | sed -r -e 's:\x1b\[[0-9;]*[mK]::g' -e 's/^/> /' >&3
+    if [ ! -v PRESERVE ]; then
+        step 'Delete cluster'
+        source "$TESTDIR/cluster_$PLATFORM.sh" delete
+    fi
+    [ $status -eq 0 ] && step "${WORKDIR##*/} run PASSED" || error "${WORKDIR##*/} run FAILED"
+    if [ -v PRESERVE ]; then
+        warn 'Keeping cluster [ -j | -k ]'
+        in_container && warn "docker commit $CONTAINER_ID validator:${WORKDIR##*/}"
+    fi
+
+    [ -f "$REPORT" ] && sed -ri 's:\x1b\[[0-9;]*[mK]::g' "$REPORT" # remove colors
+    exit $status
+}
+
+trap_ctrlc() {
+    warn 'Interrupt received'
+    trap - INT
+    pkill -INT -P $$
+}
+
+# ==================================================================================================
+# Parse parameters
+
+trap 'error "Error on ${BASH_SOURCE/$BASEDIR/.}:${LINENO} $(sed -n "${LINENO} s/^\s*//p" $BASEDIR/${BASH_SOURCE/$BASEDIR})"' ERR
+
+if [ $# -eq 0 ]; then
+    ls -d cluster-??? &> /dev/null && list_clusters || { echo "No cluster found."; exit 0; }
+fi
+
+while getopts "j:p:n:t:rRkKe:" opt; do
+    case $opt in
+        p)  PLATFORM=$OPTARG
+            [[ $PLATFORM =~ ^(k3d)$ ]] || { echo "Bad platform: $PLATFORM"; exit 1; };;
+        t)  TESTSUITE=$OPTARG;;
+        j)  CLUSTER_JSON=$(realpath -e "$OPTARG")
+            if [ -d "$CLUSTER_JSON" ]; then
+                WORKDIR="$CLUSTER_JSON"
+                CLUSTER_JSON+="/logs/cluster.json"
+                SUFFIX=$(grep -m1 '###' "$WORKDIR/logs/report" | awk '{print $(NF-1)}')
+            fi
+            PRESERVE=1;;
+        n)  [ -n "${OPTARG%:*}" ] && declare -i MASTER_COUNT=${OPTARG%:*}
+            [ -n "${OPTARG#*:}" ] && declare -i WORKER_COUNT=${OPTARG#*:};;
+        k)  PRESERVE=1;;
+        K)  PRESERVE_ON_FAILURE=1;;
+        r)  list_clusters;;
+        R)  list_clusters 'rm';;
+        e)  [ -n "${OPTARG#*=}" ] && declare "$OPTARG";;
+        \?) usage;;
+    esac
+done
+
+[ $# -eq $((OPTIND-1)) ] || { echo "Bad param: ${@:$((OPTIND-2)):3}"; exit 1; } # Detect positional arguments
+
+source "$LIBDIR/helpers.sh" # Functions used by tests
+
+# ==================================================================================================
+# Check requirements & Create WORKDIR
+
+if in_container; then
+    # SSH setup container or find shared key (data/id_shared)
+    # setup_container || ssh-add -l | grep id_shared > /dev/null
+    CONTAINER_ID="$(sed -E 's#(.*[/-]|.scope)##' /proc/1/cpuset | cut -c -12)"
+fi
+
+[ "$SUFFIX" = "root" ] && { echo "Bad SUFFIX: $SUFFIX"; false; }
+which k3d kubectl helm jq yq > /dev/null
+rpm --quiet -q ca-certificates-suse # http://download.suse.de/ibs/SUSE:/CA/
+
+[[ " $*" =~ ' -j' && " $*" =~ ' -'[np] ]] && { echo "Bad opts: -j overrides -n -p"; false; }
+[[ $TESTSUITE =~ none|join|base|full ]] || [ -f $TESTDIR/$TESTSUITE* 2>/dev/null ] || { echo "Bad test: $TESTSUITE"; false; }
+
+mkdir -p ${WORKDIR:=$(mktemp -d -p "$BASEDIR" cluster-XXX)}
+mkdir -p ${LOGPATH:=$WORKDIR/logs}
+exec &>> ${OUTPUT:=$LOGPATH/console.log}
+REPORT="$LOGPATH/report"
+CLUSTERID=$(basename $WORKDIR)
+
+export HELM_HOME="$WORKDIR/helm"
+export KUBECONFIG="$WORKDIR/admin.conf"
+trap 'trap_exit' EXIT
+trap 'trap_ctrlc' INT
+
+source "$LIBDIR/environment.sh" >> "$LOGPATH/environment.log"
+step "$(date '+%F') | ${WORKDIR##*/} | $* | $SUFFIX ###"
+
+# ==================================================================================================
+ # Create cluster
+
+cd "$WORKDIR"
+if [ -v CLUSTER_JSON ]; then
+    info "Reuse $PLATFORM cluster"
+    source "$TESTDIR/cluster_$PLATFORM.sh"
+else
+    step "Create $PLATFORM cluster"
+    source "$TESTDIR/cluster_$PLATFORM.sh" create
+    echo "$JSON" > "$LOGPATH/cluster.json"
+fi
+
+: ${IP_LB:=${IP_MASTERS[0]}}
+IP_NODES=("${IP_MASTERS[@]}" "${IP_WORKERS[@]}")
+MASTER_COUNT=${#IP_MASTERS[@]}
+WORKER_COUNT=${#IP_WORKERS[@]}
+NODE_COUNT=$((MASTER_COUNT+WORKER_COUNT))
+
+info "lb: ${IP_LB:-master[0]}"
+info "masters: ${IP_MASTERS[*]}"
+info "workers: ${IP_WORKERS[*]}"
+#wait_pods -n kube-system
+
+# ==================================================================================================
+# Run tests
+
+cd "$WORKDIR"
+curl $IP_LB:6443 > /dev/null # check that cluster if running
+
+# install cert-manager automatically
+if ! kubectl get ns cert-manager 2>/dev/null; then
+    info 'install cert-manager'
+    kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.10.0/cert-manager.yaml
+    wait_deployment -n cert-manager --all
+fi
+
+if [[ ! $TESTSUITE =~ ^none|^00_entrypoint|^kubewarden ]]; then
+    # install kubewarden as test requirement
+    kubectl get ns kubewarden || source $TESTDIR/kubewarden.sh
+fi
+
+if [ -f $TESTDIR/$TESTSUITE* ]; then
+    source $TESTDIR/$TESTSUITE*
+fi
+
+exit 0
