@@ -1,15 +1,17 @@
 ## How I use it
 
-# Alias for runner (docker wrapper for validator)
+### Alias for runner (docker wrapper for validator)
+```
 ln -s $PWD/runner ~/bin/v
+```
 
-# Build test container
+### Build test container
 ```
 # You need build.suse.de access because of certificates for now
 v build
 ```
 
-# Run tests
+#### Run tests
 ```
 # create k3d (-p platform) cluster, install kubewarden (-t test), don't delete cluster (-k) 
 # it creates cluster-XXX (cluster ID) directory which we use later
@@ -28,7 +30,7 @@ v
 v cluster-XXX -t e2etest
 ```
 
-# Create your own test.
+### Create your own test.
 ```
 # tests/thetest.sh
 step 'the test'
@@ -40,7 +42,7 @@ echo $output | grep default
 echo $output | grep kube-system
 ```
 
-# Play inside this cluster
+### Play inside this cluster
 ```
 
 # debug problems or hack on the cluster
@@ -50,7 +52,7 @@ k get pods -A
 exit
 ```
 
-# Clean up
+### Clean up
 ```
 # delete all running cluster-XXX clusters
 v run -R
