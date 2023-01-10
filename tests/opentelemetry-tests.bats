@@ -10,9 +10,6 @@ setup() {
 }
 
 @test "[OpenTelemetry] Install OpenTelemetry, Prometheus, Jaeger" {
-    kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.9.1/cert-manager.yaml
-    kubectl wait --for=condition=Available deployment --timeout=2m -n cert-manager --all
-    
     # OpemTelementry
     helm repo add --force-update open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
     helm upgrade -i --wait my-opentelemetry-operator open-telemetry/opentelemetry-operator \
@@ -33,10 +30,8 @@ setup() {
     wait_pods -n jaeger
 
     # Setup Kubewarden
-    helm_in kubewarden-controller --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml
-    helm_in kubewarden-defaults \
-      --set recommendedPolicies.enabled=True \
-      --set policyServer.telemetry.enabled=True
+    helm_in kubewarden-controller --reuse-values --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml
+    helm_in kubewarden-defaults --reuse-values --set policyServer.telemetry.enabled=True
 }
 
 @test "[OpenTelemetry] Kubewarden containers have sidecar" {
@@ -44,6 +39,6 @@ setup() {
     kubectl delete pod -n kubewarden -l app.kubernetes.io/name=kubewarden-controller
     wait_pods -n kubewarden
 
-    # Check all pods have sidecar (otc-container)
-    kubectl get pods -n kubewarden -o json | jq -e '[.items[].spec.containers[1].name == "otc-container"] | all'
+    # Check all pods have sidecar (otc-container) - might take a minute to start
+    retry "kubectl get pods -n kubewarden -o json | jq -e '[.items[].spec.containers[1].name == \"otc-container\"] | all'"
 }
