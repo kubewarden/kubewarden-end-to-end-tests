@@ -107,7 +107,7 @@ tests: $(filter-out upgrade.bats, $(TESTS))
 .PHONY: cluster install reinstall clean
 
 cluster:
-	k3d cluster create $(CLUSTER_NAME) -s 1 -a 1 --wait --timeout $(TIMEOUT) -v /dev/mapper:/dev/mapper
+	k3d cluster create $(CLUSTER_NAME) -s 1 -a 1 --wait --timeout $(TIMEOUT) -v /dev/mapper:/dev/mapper --image rancher/k3s:v1.24.9-k3s2
 	$(kube) wait --for=condition=Ready nodes --all
 
 install:
