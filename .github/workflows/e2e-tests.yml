@@ -69,6 +69,8 @@ jobs:
       - name: "Uninstall Kuberwarden"
         run: |
           # TODO - share release with the create-kubewarden-cluster action
-          helm uninstall -n kubewarden kubewarden-defaults kubewarden-controller kubewarden-crds
+          helm uninstall --wait -n kubewarden kubewarden-defaults
+          helm uninstall --wait -n kubewarden kubewarden-controller
+          helm uninstall --wait -n kubewarden kubewarden-crds
         env:
           HELM_KUBECONTEXT: k3d-${{ github.repository_owner }}-ghactions-cluster
