@@ -65,10 +65,12 @@ jobs:
           make --directory e2e-tests tests upgrade.bats
         shell: bash
         env:
-          CLUSTER_CONTEXT: k3d-${{ github.repository_owner }}-ghactions-cluster #TODO get context from setup-kubewarden-cluster-action
+          CLUSTER_NAME: ${{ github.repository_owner }}-ghactions-cluster
       - name: "Uninstall Kuberwarden"
         run: |
           # TODO - share release with the create-kubewarden-cluster action
-          helm uninstall -n kubewarden kubewarden-controller kubewarden-crds kubewarden-defaults
+          helm uninstall --wait -n kubewarden kubewarden-defaults
+          helm uninstall --wait -n kubewarden kubewarden-controller
+          helm uninstall --wait -n kubewarden kubewarden-crds
         env:
           HELM_KUBECONTEXT: k3d-${{ github.repository_owner }}-ghactions-cluster
