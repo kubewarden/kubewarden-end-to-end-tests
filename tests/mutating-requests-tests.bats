@@ -15,7 +15,7 @@ teardown_file() {
 	apply_cluster_admission_policy $RESOURCES_DIR/mutate-policy-with-flag-enabled.yaml
 
 	# New pod should be mutated by the policy
-	kubectl run pause-user-group --image k8s.gcr.io/pause
+	kubectl run pause-user-group --image registry.k8s.io/pause
 	kubectl wait --for=condition=Ready pod pause-user-group
 	kubectl get pod pause-user-group -o json | jq -e ".spec.containers[].securityContext.runAsUser==1000"
 	kubectl delete pod pause-user-group
@@ -27,7 +27,7 @@ teardown_file() {
 	apply_cluster_admission_policy $RESOURCES_DIR/mutate-policy-with-flag-disabled.yaml
 
 	# New pod should be rejected by psp-user-group-policy
-	run kubectl run pause-user-group --image k8s.gcr.io/pause
+	run kubectl run pause-user-group --image registry.k8s.io/pause
 	assert_failure
 	assert_output --partial "The policy attempted to mutate the request, but it is currently configured to not allow mutations"
 

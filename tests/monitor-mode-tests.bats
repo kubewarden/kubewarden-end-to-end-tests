@@ -27,7 +27,7 @@ teardown_file() {
 	apply_cluster_admission_policy $RESOURCES_DIR/privileged-pod-policy.yaml
 
 	# Launch privileged pod (should fail)
-	kubefail_privileged run pod-privileged --image=k8s.gcr.io/pause --privileged
+	kubefail_privileged run pod-privileged --image=registry.k8s.io/pause --privileged
 }
 
 @test "[Monitor mode end-to-end tests] Transition from protect to monitor should be disallowed" {

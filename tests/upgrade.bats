@@ -22,9 +22,9 @@ function check_default_policies {
     wait_for_cluster_admission_policy PolicyUniquelyReachable
 
     # Run privileged pod (should fail)
-    # kubefail_privileged run pod-privileged --image=k8s.gcr.io/pause --privileged
+    # kubefail_privileged run pod-privileged --image=registry.k8s.io/pause --privileged
     # Workaround - https://suse.slack.com/archives/C02DBSK7HC1/p1661518752112929
-    run -1 kubectl run pod-privileged --image=k8s.gcr.io/pause --privileged
+    run -1 kubectl run pod-privileged --image=registry.k8s.io/pause --privileged
 }
 
 
@@ -54,5 +54,5 @@ function check_default_policies {
 @test "[CRD upgrade] Disable default policies & run privileged pod" {
 	helm_in kubewarden-defaults --set recommendedPolicies.enabled=False
 	wait_rollout -n $NAMESPACE "deployment/policy-server-default"
-	kubectl run pod-privileged --image=k8s.gcr.io/pause --privileged
+	kubectl run pod-privileged --image=registry.k8s.io/pause --privileged
 }
