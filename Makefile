@@ -39,7 +39,7 @@ CRD_VERSION_SUFFIX ?= $(shell echo $(CRD_VERSION) | cut -d'/' -f2)
 # $(ROOT_RESOURCES_DIR) and changed to used the CRDs version defined in $(CRD_VERSION)
 RESOURCES_DIR ?= $(ROOT_RESOURCES_DIR)/resources_$(CRD_VERSION_SUFFIX)
 
-CLUSTER_NAME ?= kubewarden-testing #$(shell echo kubewarden-tests-$(KUBEWARDEN_CONTROLLER_CHART_VERSION) | sed 's/\./-/g')
+export CLUSTER_NAME ?= kubewarden-testing
 CLUSTER_CONTEXT ?= k3d-$(CLUSTER_NAME)
 
 # ==================================================================================================
@@ -107,7 +107,7 @@ tests: $(filter-out upgrade.bats, $(TESTS))
 .PHONY: cluster install reinstall clean
 
 cluster:
-	k3d cluster create $(CLUSTER_NAME) -s 1 -a 1 --wait --timeout $(TIMEOUT) -v /dev/mapper:/dev/mapper --image rancher/k3s:v1.24.9-k3s2
+	k3d cluster create $(CLUSTER_NAME) -s 1 -a 1 --wait --timeout $(TIMEOUT) -v /dev/mapper:/dev/mapper --image rancher/k3s:v1.24.12-k3s1
 	$(kube) wait --for=condition=Ready nodes --all
 
 install:
