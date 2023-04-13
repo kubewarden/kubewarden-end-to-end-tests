@@ -30,7 +30,7 @@ KUBEWARDEN_CRDS_CHART_RELEASE ?= kubewarden-crds
 KUBEWARDEN_DEFAULTS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json --devel | jq -r ".[0].version")
 KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json --devel | jq -r ".[1].version")
 KUBEWARDEN_DEFAULTS_CHART_RELEASE ?= kubewarden-defaults
-CERT_MANAGER_VERSION ?= v1.9.1
+CERT_MANAGER_VERSION ?= v1.11.0
 #
 # CRD version to be tested
 CRD_VERSION ?= $(shell helm show values $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --version $(KUBEWARDEN_DEFAULTS_CHART_VERSION) | yq -r ".crdVersion")
@@ -79,7 +79,7 @@ define install-kubewarden =
 endef
 
 define install-cert-manager =
-	$(kube) apply -f https://github.com/jetstack/cert-manager/releases/download/$(CERT_MANAGER_VERSION)/cert-manager.yaml
+	$(kube) apply -f https://github.com/cert-manager/cert-manager/releases/download/$(CERT_MANAGER_VERSION)/cert-manager.yaml
 	$(kube) wait --for=condition=Available deployment --timeout=2m -n cert-manager --all
 endef
 
