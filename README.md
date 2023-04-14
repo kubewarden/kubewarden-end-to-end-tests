@@ -45,7 +45,10 @@ make install # to install kubewarden (and cert-manager)
 make reinstall
 
 # Optionally you can specify versions, see top of the Makefile for options
-KUBEWARDEN_CONTROLLER_CHART_VERSION=0.3.2 make install
+KUBEWARDEN_CRDS_CHART_VERSION=1.3.0-rc6 \
+KUBEWARDEN_CONTROLLER_CHART_VERSION=1.5.0-rc6 \
+KUBEWARDEN_DEFAULTS_CHART_VERSION=1.6.0-rc7 \
+  make install
 ```
 
 
