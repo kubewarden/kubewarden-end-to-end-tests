@@ -1,0 +1,20 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicy
+metadata:
+  name: context-aware-demo
+spec:
+  module: registry://ghcr.io/kubewarden/tests/context-aware-policy-demo:v0.1.0
+  settings: {}
+  rules:
+  - apiGroups:
+    - ''
+    apiVersions:
+    - v1
+    resources:
+    - pods
+    operations:
+    - CREATE
+  mutating: true
+  contextAwareResources:
+  - apiVersion: v1
+    kind: Namespace
