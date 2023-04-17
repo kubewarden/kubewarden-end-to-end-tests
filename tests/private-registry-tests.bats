@@ -21,12 +21,31 @@ teardown_file() {
 	kubectl delete clusteradmissionpolicies private-pod-privileged ||:
 	helm_in kubewarden-defaults --reuse-values \
 		--set policyServer.imagePullSecret=null \
-		--set policyServer.insecureSources=null
+		--set policyServer.sourceAuthorities=null
+}
+
+# https://www.baeldung.com/openssl-self-signed-cert
+@test "[Private Registry] Generate certificates" {
+	certdir="$BATS_RUN_TMPDIR/certs/"
+	mkdir $certdir && cd $certdir
+
+	# Create CA
+	openssl req -nodes -batch -x509 -sha256 -days 365 -newkey rsa:2048 -keyout rootCA.key -out rootCA.crt
+	# Create CSR
+	openssl req -nodes -batch -newkey rsa:2048 -keyout domain.key -out domain.csr \
+		-addext "subjectAltName = DNS:$FQDN"
+	# Create CRT
+	openssl x509 -req -CA rootCA.crt -CAkey rootCA.key -in domain.csr -out domain.crt -days 365 -CAcreateserial \
+		-extfile <(echo "subjectAltName=DNS:$FQDN")
+	# Print CRT
+	openssl x509 -text -noout -in domain.crt
+
+	cd -
 }
 
 # https://medium.com/geekculture/deploying-docker-registry-on-kubernetes-3319622b8f32
-@test "[Private Registry] Generate AUTH, CERT and start registry" {
-	tmpdir="$BATS_RUN_TMPDIR/certs/"
+@test "[Private Registry] Generate AUTH and start registry" {
+	certdir="$BATS_RUN_TMPDIR/certs/"
 
 	# Create configmap from htpasswd
 	# docker run --entrypoint htpasswd httpd:2 -Bbn testuser testpassword
@@ -34,27 +53,23 @@ teardown_file() {
 		--from-literal htpasswd='testuser:$2y$05$bkWZdztgNvW.akipcacKb.nueDup8NGbcTtvqDKG.3keAgUDufapm'
 
 	# Create secret with certificates
-	mkdir -p $tmpdir
-	openssl req -batch \
-		-newkey rsa:4096 -nodes -sha256 -keyout $tmpdir/domain.key \
-		-addext "subjectAltName = DNS:$FQDN" \
-		-x509 -days 365 -out $tmpdir/domain.crt
-
 	kubectl create secret tls registry-cert \
-		--cert=$tmpdir/domain.crt --key=$tmpdir/domain.key
+		--cert=$certdir/domain.crt --key=$certdir/domain.key
 
 	kubectl apply -f $RESOURCES_DIR/private-registry-deploy.yaml
 	wait_rollout 'deploy/registry'
 }
 
 @test "[Private Registry] Pull & Push policy to registry" {
-	config="$BATS_RUN_TMPDIR/config.json"
-	jq -n --arg r $REGISTRY '{"auths": {($r): {"auth": "dGVzdHVzZXI6dGVzdHBhc3N3b3Jk"}}}' > $config
+	jq -n --arg r $REGISTRY \
+		'{"auths": {($r): {"auth": "dGVzdHVzZXI6dGVzdHBhc3N3b3Jk"}}}' > "$BATS_RUN_TMPDIR/config.json"
+	jq -n --arg r $REGISTRY --arg crt "$BATS_RUN_TMPDIR/certs/rootCA.crt" \
+		'{"source_authorities":{($r):[{"type":"Path","path":$crt}]}}' > "$BATS_RUN_TMPDIR/sources.json"
 
 	kwctl pull $PUB_POLICY
 	kwctl push $PUB_POLICY $PRIV_POLICY \
 		--docker-config-json-path $BATS_RUN_TMPDIR \
-		--sources-path <(echo "insecure_sources: [$REGISTRY]")
+		--sources-path "$BATS_RUN_TMPDIR/sources.json"
 }
 
 # https://docs.kubewarden.io/operator-manual/policy-servers/private-registry
@@ -68,7 +83,10 @@ teardown_file() {
 	# Edit default policy server config
 	helm_in kubewarden-defaults --reuse-values \
 		--set policyServer.imagePullSecret=secret-registry-docker \
-		--set policyServer.insecureSources[0]=$REGISTRY
+		--set policyServer.sourceAuthorities[0].uri="$REGISTRY" \
+		--set-file policyServer.sourceAuthorities[0].certs[0]="$BATS_RUN_TMPDIR/certs/rootCA.crt"
+
+	helm get values -n kubewarden kubewarden-defaults
 }
 
 @test "[Private Registry] Check I can deploy policy from auth registry" {
