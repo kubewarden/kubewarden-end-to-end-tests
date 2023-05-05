@@ -7,21 +7,23 @@ setup() {
 
 	FQDN=$(k3d node get k3d-$CLUSTER_NAME-server-0 -o json | jq -r 'first.IP.IP').nip.io
 	REGISTRY=$FQDN:30707
-	PUB_POLICY=registry://ghcr.io/kubewarden/tests/pod-privileged:v0.2.1
-	PRIV_POLICY=registry://$REGISTRY/kubewarden/tests/pod-privileged:v0.2.1
+	PUB_POLICY=registry://ghcr.io/kubewarden/tests/pod-privileged:v0.2.5
+	PRIV_POLICY=registry://$REGISTRY/kubewarden/tests/pod-privileged:v0.2.5
 }
 
 teardown_file() {
 	load common.bash
-	kubectl delete -f $RESOURCES_DIR/private-registry-deploy.yaml ||:
-	kubectl delete cm registry-auth ||:
-	kubectl delete secret registry-cert ||:
-
-	kubectl --namespace kubewarden delete secret secret-registry-docker ||:
 	kubectl delete clusteradmissionpolicies private-pod-privileged ||:
+
 	helm_in kubewarden-defaults --reuse-values \
 		--set policyServer.imagePullSecret=null \
 		--set policyServer.sourceAuthorities=null
+	# Can't delete secret - https://github.com/kubewarden/policy-server/issues/459
+	# kubectl --namespace kubewarden delete secret secret-registry-docker ||:
+
+	kubectl delete -f $RESOURCES_DIR/private-registry-deploy.yaml ||:
+	kubectl delete cm registry-auth ||:
+	kubectl delete secret registry-cert ||:
 }
 
 # https://www.baeldung.com/openssl-self-signed-cert

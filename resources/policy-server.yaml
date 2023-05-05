@@ -3,7 +3,7 @@ kind: PolicyServer
 metadata:
   name: e2e-tests
 spec:
-  image: ghcr.io/kubewarden/policy-server:v0.3.0
+  image: ghcr.io/kubewarden/policy-server:v1.6.0
   replicas: 1
   serviceAccountName: ~
   env:

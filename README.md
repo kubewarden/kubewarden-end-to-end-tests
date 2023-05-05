@@ -80,3 +80,11 @@ CLUSTER_CONTEXT=k3d-mycluster make basic-end-to-end-test.bats
 
 Also check the Kubewarden controller repository to see how run this test in a [Github
 workflow](https://github.com/kubewarden/kubewarden-controller/blob/main/.github/workflows/e2e-tests.yml)
+
+
+## Updating policies
+```
+~ cd kwctl/e2e-tests/test-data/sigstore
+~ COSIGN_PASSWORD=kubewarden cosign sign --key cosign1.key -a env=prod -a stable=true ghcr.io/kubewarden/tests/pod-privileged:v0.2.1
+~ COSIGN_PASSWORD=kubewarden cosign sign --key cosign2.key -a env=prod ghcr.io/kubewarden/tests/pod-privileged:v0.2.1
+```
