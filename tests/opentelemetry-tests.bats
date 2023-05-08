@@ -31,7 +31,7 @@ setup() {
 
     # Setup Kubewarden
     helm_in kubewarden-controller --reuse-values --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml
-    helm_in kubewarden-defaults --reuse-values --set policyServer.telemetry.enabled=True
+    helm_in kubewarden-defaults --reuse-values 
 }
 
 @test "[OpenTelemetry] Kubewarden containers have sidecar" {
