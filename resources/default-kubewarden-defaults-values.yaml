@@ -1,8 +1,6 @@
-policyServer:
+#policyServer:
 #  image:
 #    repository: "ghcr.io/myuser/policy-server"
 #    tag: "latest"
-  telemetry:
-    enabled: False
 recommendedPolicies:
   enabled: False
