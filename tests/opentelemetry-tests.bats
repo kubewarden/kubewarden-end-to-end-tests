@@ -31,14 +31,53 @@ setup() {
 
     # Setup Kubewarden
     helm_in kubewarden-controller --reuse-values --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml
-    helm_in kubewarden-defaults --reuse-values 
+    helm_in kubewarden-defaults --reuse-values --set "recommendedPolicies.enabled=True"
+
 }
 
 @test "[OpenTelemetry] Kubewarden containers have sidecar" {
     # Controller needs to be restarted to get sidecar
-    kubectl delete pod -n kubewarden -l app.kubernetes.io/name=kubewarden-controller
     wait_pods -n kubewarden
 
     # Check all pods have sidecar (otc-container) - might take a minute to start
     retry "kubectl get pods -n kubewarden -o json | jq -e '[.items[].spec.containers[1].name == \"otc-container\"] | all'"
+}
+
+@test "[OpenTelemetry] Policy server service has the metrics ports" {
+	retry "kubectl get services -n kubewarden  policy-server-default -o json | jq -e '[.spec.ports[].name == \"metrics\"] | any '"
+}
+
+@test "[OpenTelemetry] Controller service has the metrics ports" {
+	retry "kubectl get services -n kubewarden kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name == \"metrics\"] | any '"
+}
+
+@test "[OpenTelemetry] Policy server metrics should be available" {
+    # Generate metric data
+    kubectl run pod-privileged --image=registry.k8s.io/pause --privileged
+    retry "[ \$(kubectl run get-policy-server-metric -t -i --rm --wait --image curlimages/curl:8.00.1 --restart=Never -- --silent policy-server-default.kubewarden.svc.cluster.local:8080/metrics | wc -l ) -gt 10 ] || exit 1"
+}
+
+@test "[OpenTelemetry] Controller metrics should be available" {
+    retry "[ \$(kubectl run get-controller-metric -t -i --rm --wait --image curlimages/curl:8.00.1 --restart=Never -- --silent kubewarden-controller-metrics-service.kubewarden.svc.cluster.local:8080/metrics | wc -l) -gt 1 ] || exit 1"
+}
+
+@test "[OpenTelemetry] User should be able to disable telemetry" {
+    helm_in kubewarden-controller --reuse-values --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml --set "telemetry.enabled=False"
+    helm_in kubewarden-defaults --reuse-values
+}
+
+@test "[OpenTelemetry] Kubewarden containers have no sidecar" {
+    # Controller needs to be restarted to get sidecar
+    wait_pods -n kubewarden
+
+    # Check sidecars (otc-container) - have been removed
+    retry "kubectl get pods -n kubewarden -o json | jq -e '[.items[].spec.containers[1].name != \"otc-container\"] | all'"
+}
+
+@test "[OpenTelemetry] Policy server service has no metrics ports" {
+	retry "kubectl get services -n kubewarden  policy-server-default -o json | jq -e '[.spec.ports[].name != \"metrics\"] | all '"
+}
+
+@test "[OpenTelemetry] Controller service has no metrics ports" {
+	retry "kubectl get services -n kubewarden kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name != \"metrics\"] | all '"
 }
