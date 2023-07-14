@@ -8,18 +8,18 @@ TESTS_DIR ?= $(mkfile_dir)tests
 ROOT_RESOURCES_DIR ?= $(mkfile_dir)resources
 # timeout for the kubectl commands
 TIMEOUT ?= 5m
-CONTROLLER_CHART ?= kubewarden/kubewarden-controller
+# The KUBEWARDEN_CHARTS_LOCATION variable define where charts live. By default, the Helm
+# chart repository is used. However, if you want to test a local Helm chart
+# version, you can overwrite this variable with the parent directory of the chart.
+# But the chart name must be equal of the names in the Helm chart repository.
+KUBEWARDEN_CHARTS_LOCATION ?= kubewarden
+CONTROLLER_CHART ?= $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-controller
 NAMESPACE ?= kubewarden
 K3D_VERSION ?= v5.4.4
 # helm repo name used to download the Helm charts.
 KUBEWARDEN_HELM_REPO_NAME ?= kubewarden
 # URL where the Helm charts are stored
 KUBEWARDEN_HELM_REPO_URL ?= https://charts.kubewarden.io
-# The KUBEWARDEN_CHARTS_LOCATION variable define where charts live. By default, the Helm
-# chart repository is used. However, if you want to test a local Helm chart
-# version, you can overwrite this variable with the parent directory of the chart.
-# But the chart name must be equal of the names in the Helm chart repository.
-KUBEWARDEN_CHARTS_LOCATION ?= kubewarden
 
 KUBEWARDEN_CONTROLLER_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) --versions -o json --devel | jq -r ".[0].version")
 KUBEWARDEN_CONTROLLER_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) --versions -o json --devel | jq -r ".[1].version")
@@ -102,16 +102,20 @@ $(TESTS)::
 
 # Target all non-destructive tests
 .PHONY: tests
-tests: $(filter-out upgrade.bats, $(TESTS))
+tests: $(filter-out upgrade.bats audit-scanner-installation.bats, $(TESTS))
 
-.PHONY: cluster install reinstall clean
+.PHONY: cluster install reinstall clean install-deps
 
 cluster:
 	k3d cluster create $(CLUSTER_NAME) -s 1 -a 1 --wait --timeout $(TIMEOUT) -v /dev/mapper:/dev/mapper --image rancher/k3s:v1.24.12-k3s1
 	$(kube) wait --for=condition=Ready nodes --all
 
-install:
+# Target used to install dependencies. Therefore, it's possible to run tests
+# like the tests/audit-scanner-installation.bats
+install-deps:
 	$(install-cert-manager)
+
+install:  install-deps
 	$(install-kubewarden)
 
 clean:
