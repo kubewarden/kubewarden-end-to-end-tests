@@ -23,6 +23,14 @@ function helm_in {
     return 0
 }
 
+function helm_rm {
+    helm uninstall --wait --namespace $NAMESPACE $1
+}
+
+function helm_up {
+    helm upgrade --wait --namespace $NAMESPACE "${@:2}" $1 $KUBEWARDEN_CHARTS_LOCATION/$1
+}
+
 function retry() {
     local cmd=$1
     local tries=${2:-10}
