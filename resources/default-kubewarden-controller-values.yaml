@@ -7,3 +7,5 @@ policyServer:
   env:
     - name: KUBEWARDEN_LOG_LEVEL
       value: debug
+auditScanner:
+  enable: true

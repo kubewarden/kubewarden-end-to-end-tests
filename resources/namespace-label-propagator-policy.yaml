@@ -1,0 +1,18 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicy
+metadata:
+  name: psa-label-enforcer-policy
+spec:
+  policyServer: default
+  module: registry://ghcr.io/kubewarden/tests/psa-label-enforcer:v0.1.2
+  rules:
+  - apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["namespaces"]
+    operations:
+    - CREATE
+  mutating: true
+  settings:
+    modes:
+      warn: "privileged"
+      warn-version: "latest"
