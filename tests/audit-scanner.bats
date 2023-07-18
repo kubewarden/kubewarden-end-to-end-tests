@@ -44,4 +44,7 @@ setup() {
 
     retry "kubectl get policyreports polr-ns-default -o json | jq -e '[.results[] | select(.resources[0].name==\"nginx-unprivileged\") | .result==\"pass\"] | all'"
     retry "kubectl get policyreports polr-ns-default -o json | jq -e '[.results[] | select(.resources[0].name==\"nginx-privileged\") | .result==\"fail\"] | all'"
+
+    kubectl delete --wait -f $RESOURCES_DIR/privileged-pod-policy.yaml
+    kubectl delete --wait -f $RESOURCES_DIR/namespace-label-propagator-policy.yaml
 }
