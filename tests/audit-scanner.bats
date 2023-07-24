@@ -53,7 +53,7 @@ setup() {
     retry "kubectl get policyreports polr-ns-default -o json | jq -e '[.results[] | select(.resources[0].name==\"nginx-privileged\") | .result==\"fail\"] | all'"
 }
 
-@test "[Audit Scanner] Remove resource used during the test suite" {
+teardown_file() {
     kubectl delete --wait -f $RESOURCES_DIR/privileged-pod-policy.yaml
     kubectl delete --wait -f $RESOURCES_DIR/namespace-label-propagator-policy.yaml
     kubectl delete --wait -f $RESOURCES_DIR/safe-labels-namespace.yaml
