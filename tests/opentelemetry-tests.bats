@@ -54,12 +54,43 @@ setup() {
 @test "[OpenTelemetry] Policy server metrics should be available" {
     # Generate metric data
     kubectl run pod-privileged --image=registry.k8s.io/pause --privileged
-    retry "[ \$(kubectl run get-policy-server-metric -t -i --rm --wait --image curlimages/curl:8.00.1 --restart=Never -- --silent policy-server-default.kubewarden.svc.cluster.local:8080/metrics | wc -l ) -gt 10 ] || exit 1"
+    retry "[ \$(kubectl delete --ignore-not-found pod get-policy-server-metric; kubectl run get-policy-server-metric -t -i --rm --wait --image curlimages/curl:8.00.1 --restart=Never -- --silent policy-server-default.kubewarden.svc.cluster.local:8080/metrics | wc -l ) -gt 10 ] || exit 1"
 }
 
 @test "[OpenTelemetry] Controller metrics should be available" {
-    retry "[ \$(kubectl run get-controller-metric -t -i --rm --wait --image curlimages/curl:8.00.1 --restart=Never -- --silent kubewarden-controller-metrics-service.kubewarden.svc.cluster.local:8080/metrics | wc -l) -gt 1 ] || exit 1"
+    retry "[ \$(kubectl delete --ignore-not-found pod get-controller-metric; kubectl run get-controller-metric -t -i --rm --wait --image curlimages/curl:8.00.1 --restart=Never -- --silent kubewarden-controller-metrics-service.kubewarden.svc.cluster.local:8080/metrics | wc -l) -gt 1 ] || exit 1"
 }
+
+@test "[OpenTelemtry] Audit scanner runs should generate metrics" {
+    run kubectl get cronjob -A
+    assert_output -p audit-scanner
+
+    # Launch unprivileged pod
+    kubectl run nginx-unprivileged --image=nginx:alpine
+    kubectl wait --for=condition=Ready pod nginx-unprivileged
+
+    # Launch privileged pod
+    kubectl run nginx-privileged --image=registry.k8s.io/pause --privileged
+    kubectl wait --for=condition=Ready pod nginx-privileged
+
+    # Deploy some policy
+    apply_cluster_admission_policy $RESOURCES_DIR/privileged-pod-policy.yaml
+    apply_cluster_admission_policy $RESOURCES_DIR/namespace-label-propagator-policy.yaml
+
+    run kubectl get jobs -A
+    refute_output -p 'testing'
+
+    run kubectl create job  --from=cronjob/audit-scanner testing  --namespace $NAMESPACE
+    assert_output -p "testing created"
+
+    retry "kubectl get clusterpolicyreports -o json | jq -e '[.items[].metadata.name == \"polr-clusterwide\"] | any'"
+    retry "kubectl get policyreports -o json | jq -e '[.items[].metadata.name == \"polr-ns-default\"] | any'"
+    retry "[ \$(kubectl delete --ignore-not-found pod get-policy-server-metric; kubectl run get-policy-server-metric -t -i --rm --wait --image curlimages/curl:8.00.1 --restart=Never -- --silent policy-server-default.kubewarden.svc.cluster.local:8080/metrics |  grep protect | sed --silent  's/.*policy_name=\(.*\).*/\1/p' | sed 's/,.*//p' | sort -u | wc -l) -eq 2 ] || exit 1"
+
+    kubectl delete --wait -f $RESOURCES_DIR/privileged-pod-policy.yaml
+    kubectl delete --wait -f $RESOURCES_DIR/namespace-label-propagator-policy.yaml
+}
+
 
 @test "[OpenTelemetry] User should be able to disable telemetry" {
     helm_in kubewarden-controller --reuse-values --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml --set "telemetry.enabled=False"
