@@ -15,9 +15,7 @@ teardown_file() {
 }
 
 @test "[Reconfiguration tests] Reconfigure Kubewarden stack" {
-	helm upgrade --wait --namespace $NAMESPACE --reuse-values  \
-		--values=$RESOURCES_DIR/reconfiguration-values.yaml \
-		$KUBEWARDEN_CONTROLLER_CHART_RELEASE $CONTROLLER_CHART
+	helm_up kubewarden-controller --reuse-values --values=$RESOURCES_DIR/reconfiguration-values.yaml
 	wait_for_cluster_admission_policy PolicyActive
 }
 

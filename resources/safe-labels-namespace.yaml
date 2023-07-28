@@ -18,4 +18,3 @@ spec:
       operations:
       - CREATE
   mutating: false
-  backgroundAudit: true

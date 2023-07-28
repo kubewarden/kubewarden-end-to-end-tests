@@ -15,8 +15,8 @@ setup() {
     kubectl create -f https://github.com/kubernetes-sigs/wg-policy-prototypes/raw/master/policy-report/crd/v1alpha2/wgpolicyk8s.io_policyreports.yaml
     kubectl create -f https://github.com/kubernetes-sigs/wg-policy-prototypes/raw/master/policy-report/crd/v1alpha2/wgpolicyk8s.io_clusterpolicyreports.yaml
 
-    helm_in kubewarden-crds  --set installPolicyReportCRDs=False
-    helm_in kubewarden-controller  --set auditScanner.enable=True
+    helm_in kubewarden-crds --set installPolicyReportCRDs=False
+    helm_in kubewarden-controller
     helm_in kubewarden-defaults  \
         --set recommendedPolicies.enabled=True \
         --set recommendedPolicies.defaultPolicyMode=protect \
@@ -53,8 +53,8 @@ setup() {
     run kubectl get cronjob -A
     refute_output -p audit-scanner
 
-    helm_in kubewarden-crds  --set installPolicyReportCRDs=True
-    helm_in kubewarden-controller  --set auditScanner.enable=True
+    helm_in kubewarden-crds # defaults to installPolicyReportCRDs=True
+    helm_in kubewarden-controller
     helm_in kubewarden-defaults  \
         --set recommendedPolicies.enabled=True \
         --set recommendedPolicies.defaultPolicyMode=protect \

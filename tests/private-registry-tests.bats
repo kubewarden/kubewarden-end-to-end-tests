@@ -15,7 +15,7 @@ teardown_file() {
 	load common.bash
 	kubectl delete clusteradmissionpolicies private-pod-privileged ||:
 
-	helm_in kubewarden-defaults --reuse-values \
+	helm_up kubewarden-defaults --reuse-values \
 		--set policyServer.imagePullSecret=null \
 		--set policyServer.sourceAuthorities=null
 	# Can't delete secret - https://github.com/kubewarden/policy-server/issues/459
@@ -83,7 +83,7 @@ teardown_file() {
 	  --docker-server=$REGISTRY
 
 	# Edit default policy server config
-	helm_in kubewarden-defaults --reuse-values \
+	helm_up kubewarden-defaults --reuse-values \
 		--set policyServer.imagePullSecret=secret-registry-docker \
 		--set policyServer.sourceAuthorities[0].uri="$REGISTRY" \
 		--set-file policyServer.sourceAuthorities[0].certs[0]="$BATS_RUN_TMPDIR/certs/rootCA.crt"
