@@ -13,8 +13,10 @@ function helm() {
 	command helm --kube-context $CLUSTER_CONTEXT "$@"
 }
 
-function helm_in {
-    helm upgrade --install --wait --namespace $NAMESPACE --create-namespace \
+# Upgrade helm chart, but won't install if it does not exist
+function helm_up {
+    helm upgrade --devel --wait \
+        --namespace $NAMESPACE --create-namespace \
         "${@:2}" $1 $KUBEWARDEN_CHARTS_LOCATION/$1
 
     # kubewarden-defaults ignore wait param, so rollout status would fail without retry (does not exist yet)
@@ -27,8 +29,9 @@ function helm_rm {
     helm uninstall --wait --namespace $NAMESPACE $1
 }
 
-function helm_up {
-    helm upgrade --wait --namespace $NAMESPACE "${@:2}" $1 $KUBEWARDEN_CHARTS_LOCATION/$1
+# Install or upgrade helm chart
+function helm_in {
+    helm_up $@ --install
 }
 
 function retry() {

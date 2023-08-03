@@ -90,8 +90,9 @@ endef
 # ==================================================================================================
 # Targets
 
-# Upgrade test requires new cluster
-upgrade.bats:: clean cluster
+# Destructive tests that reinstall kubewarden
+# Test is responsible for used kubewarden version
+upgrade.bats audit-scanner-installation.bats:: clean cluster
 	$(install-cert-manager)
 
 # Generate target for every test file
@@ -104,18 +105,14 @@ $(TESTS)::
 .PHONY: tests
 tests: $(filter-out upgrade.bats audit-scanner-installation.bats, $(TESTS))
 
-.PHONY: cluster install reinstall clean install-deps
+.PHONY: cluster install reinstall clean
 
 cluster:
 	k3d cluster create $(CLUSTER_NAME) -s 1 -a 1 --wait --timeout $(TIMEOUT) -v /dev/mapper:/dev/mapper --image rancher/k3s:v1.24.12-k3s1
 	$(kube) wait --for=condition=Ready nodes --all
 
-# Target used to install dependencies. Therefore, it's possible to run tests
-# like the tests/audit-scanner-installation.bats
-install-deps:
+install:
 	$(install-cert-manager)
-
-install:  install-deps
 	$(install-kubewarden)
 
 clean:

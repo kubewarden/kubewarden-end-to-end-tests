@@ -39,9 +39,9 @@ function check_default_policies {
 }
 
 @test "[CRD upgrade] Upgrade Kubewarden" {
-    helm_in kubewarden-crds --version $KUBEWARDEN_CRDS_CHART_VERSION
-    helm_in kubewarden-controller --version $KUBEWARDEN_CONTROLLER_CHART_VERSION
-    helm_in kubewarden-defaults --version $KUBEWARDEN_DEFAULTS_CHART_VERSION
+    helm_up kubewarden-crds --version $KUBEWARDEN_CRDS_CHART_VERSION
+    helm_up kubewarden-controller --version $KUBEWARDEN_CONTROLLER_CHART_VERSION
+    helm_up kubewarden-defaults --version $KUBEWARDEN_DEFAULTS_CHART_VERSION
     check_default_policies
 }
 
@@ -52,7 +52,7 @@ function check_default_policies {
 }
 
 @test "[CRD upgrade] Disable default policies & run privileged pod" {
-	helm_in kubewarden-defaults --set recommendedPolicies.enabled=False
+	helm_up kubewarden-defaults --set recommendedPolicies.enabled=False
 	wait_rollout -n $NAMESPACE "deployment/policy-server-default"
 	kubectl run pod-privileged --image=registry.k8s.io/pause --privileged
 }

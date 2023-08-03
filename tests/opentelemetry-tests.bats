@@ -30,8 +30,8 @@ setup() {
     wait_pods -n jaeger
 
     # Setup Kubewarden
-    helm_in kubewarden-controller --reuse-values --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml
-    helm_in kubewarden-defaults --reuse-values --set "recommendedPolicies.enabled=True"
+    helm_up kubewarden-controller --reuse-values --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml
+    helm_up kubewarden-defaults --reuse-values --set "recommendedPolicies.enabled=True"
 
 }
 
@@ -93,8 +93,8 @@ setup() {
 
 
 @test "[OpenTelemetry] User should be able to disable telemetry" {
-    helm_in kubewarden-controller --reuse-values --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml --set "telemetry.enabled=False"
-    helm_in kubewarden-defaults --reuse-values
+    helm_up kubewarden-controller --reuse-values --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml --set "telemetry.enabled=False"
+    helm_up kubewarden-defaults --reuse-values
 }
 
 @test "[OpenTelemetry] Kubewarden containers have no sidecar" {
