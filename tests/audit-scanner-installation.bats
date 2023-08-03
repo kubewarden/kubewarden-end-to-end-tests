@@ -19,8 +19,7 @@ setup() {
     helm_in kubewarden-controller
     helm_in kubewarden-defaults  \
         --set recommendedPolicies.enabled=True \
-        --set recommendedPolicies.defaultPolicyMode=protect \
-        --set policyServer.image.tag="latest"
+        --set recommendedPolicies.defaultPolicyMode=protect
 
     run kubectl api-resources
     assert_output -p 'ClusterPolicyReport'
@@ -57,8 +56,7 @@ setup() {
     helm_in kubewarden-controller
     helm_in kubewarden-defaults  \
         --set recommendedPolicies.enabled=True \
-        --set recommendedPolicies.defaultPolicyMode=protect \
-        --set policyServer.image.tag="latest"
+        --set recommendedPolicies.defaultPolicyMode=protect
 
     run kubectl api-resources
     assert_output -p 'ClusterPolicyReport'
