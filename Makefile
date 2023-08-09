@@ -92,7 +92,8 @@ endef
 
 # Destructive tests that reinstall kubewarden
 # Test is responsible for used kubewarden version
-upgrade.bats audit-scanner-installation.bats:: clean cluster
+upgrade.bats::
+	$(MAKE) clean cluster
 	$(install-cert-manager)
 
 # Generate target for every test file

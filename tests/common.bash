@@ -13,9 +13,23 @@ function helm() {
 	command helm --kube-context $CLUSTER_CONTEXT "$@"
 }
 
+function curlpod() {
+    kubectl run curlpod -t -i --rm --wait --image curlimages/curl:8.00.1 --restart=Never -- $@
+}
+
 # Upgrade helm chart, but won't install if it does not exist
 function helm_up {
-    helm upgrade --devel --wait \
+    # set default version, can be overridden with parameters
+    case $1 in
+        'kubewarden-controller')
+            def_version=$KUBEWARDEN_CRDS_CHART_VERSION;;
+        'kubewarden-defaults')
+            def_version=$KUBEWARDEN_DEFAULTS_CHART_VERSION;;
+        'kubewarden-crds')
+            def_version=$KUBEWARDEN_CRDS_CHART_VERSION;;
+    esac
+
+    helm upgrade --version $def_version --wait \
         --namespace $NAMESPACE --create-namespace \
         "${@:2}" $1 $KUBEWARDEN_CHARTS_LOCATION/$1
 
@@ -32,6 +46,13 @@ function helm_rm {
 # Install or upgrade helm chart
 function helm_in {
     helm_up $@ --install
+}
+
+function kubewarden_remove {
+    helm list -n $NAMESPACE | grep '^kubewarden-defaults'   && helm_rm kubewarden-defaults
+    helm list -n $NAMESPACE | grep '^kubewarden-controller' && helm_rm kubewarden-controller
+    helm list -n $NAMESPACE | grep '^kubewarden-crds'       && helm_rm kubewarden-crds
+    return 0
 }
 
 function retry() {

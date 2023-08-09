@@ -28,12 +28,9 @@ setup() {
 }
 
 @test "[Audit Scanner] Trigger audit scanner job" {
-    run kubectl get jobs -A
-    refute_output -p 'testing'
-
     run kubectl create job  --from=cronjob/audit-scanner testing  --namespace $NAMESPACE
     assert_output -p "testing created"
-    run kubectl wait --for=condition="Complete" job testing --namespace $NAMESPACE
+    kubectl wait --for=condition="Complete" job testing --namespace $NAMESPACE
 }
 
 @test "[Audit Scanner] Check cluster wide report results" {
@@ -53,9 +50,10 @@ setup() {
 }
 
 teardown_file() {
-    kubectl delete --wait -f $RESOURCES_DIR/privileged-pod-policy.yaml
-    kubectl delete --wait -f $RESOURCES_DIR/namespace-label-propagator-policy.yaml
-    kubectl delete --wait -f $RESOURCES_DIR/safe-labels-namespace.yaml
+    kubectl delete -f $RESOURCES_DIR/privileged-pod-policy.yaml
+    kubectl delete -f $RESOURCES_DIR/namespace-label-propagator-policy.yaml
+    kubectl delete -f $RESOURCES_DIR/safe-labels-namespace.yaml
     kubectl delete ns testing-audit-scanner
-    kubectl delete --wait pod nginx-privileged nginx-unprivileged
+    kubectl delete pod nginx-privileged nginx-unprivileged
+    kubectl delete jobs -n kubewarden testing
 }

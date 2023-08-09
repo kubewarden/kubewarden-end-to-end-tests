@@ -39,9 +39,9 @@ function check_default_policies {
 }
 
 @test "[CRD upgrade] Upgrade Kubewarden" {
-    helm_up kubewarden-crds --version $KUBEWARDEN_CRDS_CHART_VERSION
-    helm_up kubewarden-controller --version $KUBEWARDEN_CONTROLLER_CHART_VERSION
-    helm_up kubewarden-defaults --version $KUBEWARDEN_DEFAULTS_CHART_VERSION
+    helm_up kubewarden-crds --reuse-values --version $KUBEWARDEN_CRDS_CHART_VERSION
+    helm_up kubewarden-controller --reuse-values --version $KUBEWARDEN_CONTROLLER_CHART_VERSION
+    helm_up kubewarden-defaults --reuse-values --version $KUBEWARDEN_DEFAULTS_CHART_VERSION
     check_default_policies
 }
 
