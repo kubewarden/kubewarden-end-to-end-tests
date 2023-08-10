@@ -22,7 +22,7 @@ function helm_up {
     # set default version, can be overridden with parameters
     case $1 in
         'kubewarden-controller')
-            def_version=$KUBEWARDEN_CRDS_CHART_VERSION;;
+            def_version=$KUBEWARDEN_CONTROLLER_CHART_VERSION;;
         'kubewarden-defaults')
             def_version=$KUBEWARDEN_DEFAULTS_CHART_VERSION;;
         'kubewarden-crds')
