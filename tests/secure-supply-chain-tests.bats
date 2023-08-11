@@ -17,6 +17,7 @@ setup() {
 }
 
 teardown_file() {
+	load common.bash
 	helm_up kubewarden-defaults --set policyServer.verificationConfig=""
 	kubectl delete configmap -n $NAMESPACE $CONFIGMAP_NAME --ignore-not-found
 }
