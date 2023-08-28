@@ -18,7 +18,6 @@ teardown_file() {
 	# Launch unprivileged pod
 	kubectl run nginx-unprivileged --image=nginx:alpine
 	kubectl wait --for=condition=Ready pod nginx-unprivileged
-
 	# Launch privileged pod (should fail)
 	kubefail_privileged run pod-privileged --image=registry.k8s.io/pause --privileged
 }

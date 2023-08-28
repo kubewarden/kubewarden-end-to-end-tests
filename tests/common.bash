@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 bats_require_minimum_version 1.7.0
 
 load "../helpers/bats-support/load.bash"
@@ -62,6 +61,17 @@ function retry() {
     local i
     for ((i=1; i<=tries; i++)); do
         timeout 25 bash -c "$cmd" && break || echo "RETRY #$i: $cmd"
+        [ $i -ne $tries ] && sleep $delay || { echo "Godot: $cmd"; false; }
+    done
+}
+
+function wait_for_failure() {
+    local cmd=$1
+    local tries=${2:-10}
+    local delay=${3:-30}
+    local i
+    for ((i=1; i<=tries; i++)); do
+        timeout 25 bash -c "$cmd" || break || echo "RETRY #$i: $cmd"
         [ $i -ne $tries ] && sleep $delay || { echo "Godot: $cmd"; false; }
     done
 }
