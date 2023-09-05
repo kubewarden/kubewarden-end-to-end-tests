@@ -15,7 +15,7 @@ teardown_file() {
 }
 
 @test "[Reconfiguration tests] Reconfigure Kubewarden stack" {
-	helm_up kubewarden-controller --reuse-values --values=$RESOURCES_DIR/reconfiguration-values.yaml
+	helm_up kubewarden-controller --values=$RESOURCES_DIR/reconfiguration-values.yaml
 	wait_for_cluster_admission_policy PolicyActive
 }
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 
 setup() {
-  load common.bash
-  wait_pods -n kube-system
+    load common.bash
+    wait_pods -n kube-system
 }
 
 @test "[Audit Scanner] Install testing policies and resources" {
@@ -35,7 +35,8 @@ setup() {
 
 @test "[Audit Scanner] Check cluster wide report results" {
     local report=$(kubectl get clusterpolicyreports polr-clusterwide -o json | jq -ec)
-    echo "$report" | jq -e '.summary.pass == 13'
+    # clean cluster = 13, but recommended policies or other resources can increase this
+    echo "$report" | jq -e '.summary.pass >= 13'
     echo "$report" | jq -e '.summary.fail == 1'
     echo "$report" | jq -e '[.results[] | select(.resources[0].name=="default") | .result=="pass"] | all'
     echo "$report" | jq -e '[.results[] | select(.resources[0].name == "testing-audit-scanner" and .policy == "cap-safe-labels")] | all(.result == "fail")'
