@@ -35,7 +35,7 @@ function helm_up {
 
     # kubewarden-defaults ignore wait param, so rollout status would fail without retry (does not exist yet)
     # retry function requires full command, not a function
-    [ $1 = 'kubewarden-defaults' ] && retry "kubectl --context $CLUSTER_CONTEXT rollout status -n kubewarden deployment/policy-server-default"
+    [ $1 = 'kubewarden-defaults' ] && retry "kubectl rollout status -n kubewarden deployment/policy-server-default"
     return 0
 }
 
@@ -60,6 +60,10 @@ function retry() {
     local tries=${2:-10}
     local delay=${3:-30}
     local i
+
+    # Github runner is shared - we must use context for cluster commands
+    [[ "$cmd" =~ ^(kubectl|helm) ]] && cmd="${cmd/ / --context $CLUSTER_CONTEXT }"
+
     for ((i=1; i<=tries; i++)); do
         timeout 25 bash -c "$cmd" && break || echo "RETRY #$i: $cmd"
         [ $i -ne $tries ] && sleep $delay || { echo "Godot: $cmd"; false; }
