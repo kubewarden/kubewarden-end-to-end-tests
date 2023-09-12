@@ -30,9 +30,8 @@ setup() {
     wait_pods -n jaeger
 
     # Setup Kubewarden
-    helm_up kubewarden-controller --reuse-values --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml
-    helm_up kubewarden-defaults --reuse-values --set "recommendedPolicies.enabled=True"
-
+    helm_up kubewarden-controller --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml
+    helm_up kubewarden-defaults --set "recommendedPolicies.enabled=True"
 }
 
 @test "[OpenTelemetry] Kubewarden containers have sidecars & metrics" {
@@ -80,8 +79,8 @@ setup() {
 }
 
 @test "[OpenTelemetry] Disabling telemetry should remove sidecars & metrics" {
-    helm_up kubewarden-controller --reuse-values --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml --set "telemetry.enabled=False"
-    helm_up kubewarden-defaults --reuse-values
+    helm_up kubewarden-controller --set "telemetry.enabled=False"
+    helm_up kubewarden-defaults --set "recommendedPolicies.enabled=True"
     wait_pods -n kubewarden
 
     # Check sidecars (otc-container) - have been removed
@@ -89,12 +88,13 @@ setup() {
     # Policy server service has no metrics ports
     kubectl get services -n kubewarden policy-server-default -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
     # Controller service has no metrics ports
-    kubectl get services -n kubewarden kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name != "metrics"] | all '
+    kubectl get services -n kubewarden kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
 }
 
 teardown_file() {
-    kubectl delete -f $RESOURCES_DIR/privileged-pod-policy.yaml
-    kubectl delete -f $RESOURCES_DIR/namespace-label-propagator-policy.yaml
-    kubectl delete pod nginx-privileged nginx-unprivileged
-    kubectl delete jobs -n kubewarden testing
+    # Resources might be already deleted by helm update
+    kubectl delete -f $RESOURCES_DIR/privileged-pod-policy.yaml --ignore-not-found
+    kubectl delete -f $RESOURCES_DIR/namespace-label-propagator-policy.yaml  --ignore-not-found
+    kubectl delete pod nginx-privileged nginx-unprivileged --ignore-not-found
+    kubectl delete jobs -n kubewarden testing --ignore-not-found
 }
