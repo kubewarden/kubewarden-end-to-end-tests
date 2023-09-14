@@ -62,7 +62,8 @@ function retry() {
     local i
 
     # Github runner is shared - we must use context for cluster commands
-    [[ "$cmd" =~ ^(kubectl|helm) ]] && cmd="${cmd/ / --context $CLUSTER_CONTEXT }"
+    [[ "$cmd" == kubectl* ]] && cmd="${cmd/ / --context $CLUSTER_CONTEXT }"
+    [[ "$cmd" == helm* ]] && cmd="${cmd/ / --kube-context $CLUSTER_CONTEXT }"
 
     for ((i=1; i<=tries; i++)); do
         timeout 25 bash -c "$cmd" && break || echo "RETRY #$i: $cmd"
