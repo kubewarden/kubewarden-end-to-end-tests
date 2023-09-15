@@ -22,7 +22,6 @@ function helm_up {
     # set default version, can be overridden with parameters
     case $1 in
         'kubewarden-controller')
-            extra_params="--set auditScanner.image.tag=latest"
             def_version=$KUBEWARDEN_CONTROLLER_CHART_VERSION;;
         'kubewarden-defaults')
             def_version=$KUBEWARDEN_DEFAULTS_CHART_VERSION;;
@@ -30,7 +29,7 @@ function helm_up {
             def_version=$KUBEWARDEN_CRDS_CHART_VERSION;;
     esac
 
-    helm upgrade --version $def_version ${extra_params:-} --wait \
+    helm upgrade --version $def_version --wait \
         --namespace $NAMESPACE --create-namespace \
         "${@:2}" $1 $KUBEWARDEN_CHARTS_LOCATION/$1
 
