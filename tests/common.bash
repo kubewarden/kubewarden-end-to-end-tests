@@ -13,8 +13,14 @@ function helm() {
 	command helm --kube-context $CLUSTER_CONTEXT "$@"
 }
 
-function curlpod() {
-    kubectl run curlpod -t -i --rm --wait --image curlimages/curl:8.00.1 --restart=Never -- $@
+# get_metrics policy-server-default
+function get_metrics {
+    pod=$1
+    ns=${2:-$NAMESPACE}
+
+    kubectl delete pod curlpod --ignore-not-found
+    kubectl run curlpod -t -i --rm --wait --image curlimages/curl:8.00.1 --restart=Never -- \
+        --silent $pod.$ns.svc.cluster.local:8080/metrics
 }
 
 # Upgrade helm chart, but won't install if it does not exist
@@ -60,6 +66,9 @@ function retry() {
     local tries=${2:-10}
     local delay=${3:-30}
     local i
+
+    # export functions into bash -c env
+    [[ "$cmd" =~ get_metrics ]] && export -f get_metrics
 
     # Github runner is shared - we must use context for cluster commands
     [[ "$cmd" == kubectl* ]] && cmd="${cmd/ / --context $CLUSTER_CONTEXT }"

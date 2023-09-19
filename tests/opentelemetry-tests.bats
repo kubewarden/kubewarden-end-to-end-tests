@@ -50,10 +50,9 @@ setup() {
     kubectl wait --for=condition=Ready pod pod-privileged
     kubectl delete --wait pod pod-privileged
 
-    # Policy server metrics should be available
-    test $(curlpod --silent policy-server-default.kubewarden.svc.cluster.local:8080/metrics | wc -l ) -gt 10
-    # Controller metrics should be available
-    test $(curlpod --silent kubewarden-controller-metrics-service.kubewarden.svc.cluster.local:8080/metrics | wc -l) -gt 1
+    # Policy server & controller metrics should be available
+    retry 'test $(get_metrics policy-server-default | wc -l) -gt 10'
+    retry 'test $(get_metrics kubewarden-controller-metrics-service | wc -l) -gt 1'
 }
 
 @test "[OpenTelemetry] Audit scanner runs should generate metrics" {
@@ -75,7 +74,7 @@ setup() {
 
     kubectl get clusterpolicyreports polr-clusterwide
     kubectl get policyreports polr-ns-default
-    test $(curlpod --silent policy-server-default.kubewarden.svc.cluster.local:8080/metrics | grep protect | sed --silent  's/.*policy_name=\(.*\).*/\1/p' | sed 's/,.*//p' | sort -u | wc -l) -eq 2
+    retry 'test $(get_metrics policy-server-default | grep protect | grep -oE "policy_name=\"[^\"]+" | sort -u | wc -l) -eq 2'
 }
 
 @test "[OpenTelemetry] Disabling telemetry should remove sidecars & metrics" {
