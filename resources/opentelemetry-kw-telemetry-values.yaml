@@ -4,6 +4,6 @@ telemetry:
     port: 8080
   tracing:
     jaeger:
-      endpoint: "my-open-telemetry-collector.jaeger.svc.cluster.local:14250"
+      endpoint: "my-open-telemetry-collector.jaeger.svc.cluster.local:4317"
       tls:
         insecure: true
