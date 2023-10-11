@@ -11,8 +11,9 @@ like yaml files to deploy Kubernetes resources.
 
 > **Note:** this repository makes use of git submodules. Ensure you run the following
 > command:
+>
 > ```console
-> git submodule update --int
+> git submodule update --init
 > ```
 
 Tests are written using [bats](https://github.com/bats-core/bats-core).
@@ -51,7 +52,6 @@ KUBEWARDEN_DEFAULTS_CHART_VERSION=1.6.0-rc7 \
   make install
 ```
 
-
 ## Running the tests
 
 Once you have a cluster with Kubewarden install, you can run the basic
@@ -70,7 +70,6 @@ make upgrade.bats
 
 ```
 
-
 All the tests run on a given `kubectl` context. Thus, if you want to run the
 tests on a cluster already in place, you need to define the context:
 
@@ -81,8 +80,8 @@ CLUSTER_CONTEXT=k3d-mycluster make basic-end-to-end-test.bats
 Also check the Kubewarden controller repository to see how run this test in a [Github
 workflow](https://github.com/kubewarden/kubewarden-controller/blob/main/.github/workflows/e2e-tests.yml)
 
-
 ## Updating policies
+
 ```
 ~ cd kwctl/e2e-tests/test-data/sigstore
 ~ COSIGN_PASSWORD=kubewarden cosign sign --key cosign1.key -a env=prod -a stable=true ghcr.io/kubewarden/tests/pod-privileged:v0.2.1
