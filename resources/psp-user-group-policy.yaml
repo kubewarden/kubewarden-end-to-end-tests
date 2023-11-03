@@ -1,7 +1,8 @@
-apiVersion: policies.kubewarden.io/v1alpha2
-kind: ClusterAdmissionPolicy
+apiVersion: policies.kubewarden.io/v1
+kind: AdmissionPolicy
 metadata:
   name: psp-user-group
+  namespace: default
 spec:
   policyServer: default
   module: registry://ghcr.io/kubewarden/tests/user-group-psp:v0.4.7
@@ -13,12 +14,12 @@ spec:
           - kubewarden
           - kube-system
   rules:
-  - apiGroups: [""]
-    apiVersions: ["v1"]
-    resources: ["pods"]
-    operations:
-    - CREATE
-    - UPDATE
+    - apiGroups: [""]
+      apiVersions: ["v1"]
+      resources: ["pods"]
+      operations:
+        - CREATE
+        - UPDATE
   mutating: true
   settings:
     run_as_user:
@@ -32,4 +33,3 @@ spec:
       rule: "RunAsAny"
     supplemental_groups:
       rule: "RunAsAny"
-
