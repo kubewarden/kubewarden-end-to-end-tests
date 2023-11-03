@@ -41,8 +41,8 @@ teardown_file() {
 	kubectl label pod nginx-privileged x=y
 }
 
-@test "[Basic end-to-end tests] Apply mutating psp-user-group ClusterAdmissionPolicy" {
-	apply_cluster_admission_policy $RESOURCES_DIR/psp-user-group-policy.yaml
+@test "[Basic end-to-end tests] Apply mutating psp-user-group AdmissionPolicy" {
+	apply_admission_policy $RESOURCES_DIR/psp-user-group-policy.yaml
 
 	# Policy should mutate pods
 	kubectl run pause-user-group --image registry.k8s.io/pause
