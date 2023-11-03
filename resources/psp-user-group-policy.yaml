@@ -6,13 +6,6 @@ metadata:
 spec:
   policyServer: default
   module: registry://ghcr.io/kubewarden/tests/user-group-psp:v0.4.7
-  namespaceSelector:
-    matchExpressions:
-      - key: "kubernetes.io/metadata.name"
-        operator: NotIn
-        values:
-          - kubewarden
-          - kube-system
   rules:
     - apiGroups: [""]
       apiVersions: ["v1"]
