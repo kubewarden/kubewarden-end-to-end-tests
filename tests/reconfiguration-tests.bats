@@ -7,6 +7,7 @@ setup() {
 
 teardown_file() {
 	kubectl delete pods --all
+	kubectl delete admissionpolicies --all -A
 	kubectl delete clusteradmissionpolicies --all
 }
 
