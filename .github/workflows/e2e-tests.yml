@@ -50,6 +50,10 @@ jobs:
         uses: mig4/setup-bats@v1.2.0
         with:
           bats-version: 1.7.0
+      - name: "Install kwctl"
+        uses: kubewarden/github-actions/kwctl-installer@main
+        with:
+          KWCTL_VERSION: latest
       - name: "Create Kubernetes cluster with Kubewarden installed"
         uses: kubewarden/github-actions/setup-kubewarden-cluster-action@main
         with:
