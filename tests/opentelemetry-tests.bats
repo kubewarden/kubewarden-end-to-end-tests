@@ -72,8 +72,6 @@ setup() {
     assert_output -p "testing created"
     kubectl wait --for=condition="Complete" job testing --namespace $NAMESPACE
 
-    kubectl get clusterpolicyreports polr-clusterwide
-    kubectl get policyreports polr-ns-default
     retry 'test $(get_metrics policy-server-default | grep protect | grep -oE "policy_name=\"[^\"]+" | sort -u | wc -l) -eq 2'
 }
 
