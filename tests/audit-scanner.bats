@@ -34,20 +34,31 @@ setup() {
 }
 
 @test "[Audit Scanner] Check cluster wide report results" {
-    local report=$(kubectl get clusterpolicyreports polr-clusterwide -o json | jq -ec)
-    # clean cluster = 13, but recommended policies or other resources can increase this
-    echo "$report" | jq -e '.summary.pass >= 13'
+    testing_namespace_uid=$(kubectl get ns testing-audit-scanner -o=json | jq -r ".metadata.uid")
+    local report=$(kubectl get clusterpolicyreports "$testing_namespace_uid" -o json | jq -ec)
+    echo "$report" | jq -e '.summary.pass == 1'
     echo "$report" | jq -e '.summary.fail == 1'
-    echo "$report" | jq -e '[.results[] | select(.resources[0].name=="default") | .result=="pass"] | all'
-    echo "$report" | jq -e '[.results[] | select(.resources[0].name == "testing-audit-scanner" and .policy == "cap-safe-labels")] | all(.result == "fail")'
+    echo "$report" | jq -e '[.results[] | select(.policy == "clusterwide-safe-labels")] | all(.result == "fail")'
+    echo "$report" | jq -e '[.results[] | select(.policy == "clusterwide-psa-label-enforcer-policy")] | all(.result == "pass")'
+    default_namespace_uid=$(kubectl get ns default -o=json | jq -r ".metadata.uid")
+    local report=$(kubectl get clusterpolicyreports "$default_namespace_uid" -o json | jq -ec)
+    echo "$report" | jq -e '.summary.pass == 2'
+    echo "$report" | jq -e '.summary.fail == 0'
+    echo "$report" | jq -e '[.results[] | select(.result=="pass")] | all'
 }
 
 @test "[Audit Scanner] Check namespaced report results" {
-    local report=$(kubectl get policyreports polr-ns-default -o json | jq -ec)
+    privileged_pod_uid=$(kubectl get pods nginx-privileged  -o=json | jq -r ".metadata.uid")
+    local report=$(kubectl get policyreports "$privileged_pod_uid" -o json | jq -ec)
     echo "$report" | jq -e '.summary.fail == 1'
+    echo "$report" | jq -e '.summary.pass == 0'
+    echo "$report" | jq -e '[.results[] | select(.policy == "clusterwide-privileged-pods") | .result=="fail"] | all'
+
+    unprivileged_pod_uid=$(kubectl get pods nginx-unprivileged  -o=json | jq -r ".metadata.uid")
+    local report=$(kubectl get policyreports "$unprivileged_pod_uid" -o json | jq -ec)
+    echo "$report" | jq -e '.summary.fail == 0'
     echo "$report" | jq -e '.summary.pass == 1'
-    echo "$report" | jq -e '[.results[] | select(.resources[0].name=="nginx-unprivileged") | .result=="pass"] | all'
-    echo "$report" | jq -e '[.results[] | select(.resources[0].name=="nginx-privileged") | .result=="fail"] | all'
+    echo "$report" | jq -e '[.results[] | select(.policy == "clusterwide-privileged-pods") | .result=="pass"] | all'
 }
 
 teardown_file() {
