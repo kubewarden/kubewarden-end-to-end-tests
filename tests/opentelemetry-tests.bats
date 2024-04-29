@@ -13,6 +13,7 @@ setup() {
     # OpemTelementry
     helm repo add --force-update open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
     helm upgrade -i --wait my-opentelemetry-operator open-telemetry/opentelemetry-operator \
+        --set "manager.collectorImage.repository=otel/opentelemetry-collector-contrib" \
         -n open-telemetry --create-namespace
 
     # Prometheus
