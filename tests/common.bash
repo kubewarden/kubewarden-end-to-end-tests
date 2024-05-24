@@ -153,6 +153,7 @@ function wait_for_cluster_admission_policy {
 }
 
 function wait_for_default_policy_server_rollout {
+    sleep 2 # removing policy does not trigger immediate rollout
 	revision=$(kubectl -n $NAMESPACE get "deployment/policy-server-default" -o json | jq -r '.metadata.annotations."deployment.kubernetes.io/revision"')
 	wait_rollout -n $NAMESPACE --revision $revision "deployment/policy-server-default"
 }
