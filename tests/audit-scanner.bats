@@ -5,6 +5,55 @@ setup() {
     wait_pods -n kube-system
 }
 
+trigger_audit_scan() {
+    local jobname=${1:-testing}
+    kubectl delete --ignore-not-found job $jobname --namespace $NAMESPACE
+    kubectl create job  --from=cronjob/audit-scanner $jobname  --namespace $NAMESPACE | grep "$jobname created"
+    kubectl wait --for=condition="Complete" job $jobname --namespace $NAMESPACE
+}
+
+# get_report "pod/podname"
+get_report() {
+    local resource="$1"
+    # Find resource UID
+    local ruid=$(kubectl get $resource -o jsonpath='{.metadata.uid}')
+    # Figure out if resource report is namespaced or not
+    kubectl api-resources --namespaced=false | grep -qw ${resource%/*} && rtype=cpolr || rtype=polr
+    # Print resource report
+    kubectl get $rtype $ruid -o json
+}
+
+# check_report_summary "$report" 2 0
+check_report_summary() {
+    local report="$1"
+    local expected_pass="$2"
+    local expected_fail="$3"
+
+    echo "$report" | jq -e ".summary.pass == $expected_pass"
+    echo "$report" | jq -e ".summary.fail == $expected_fail"
+}
+
+# check_report_result "$report" pass|fail|null [policy_name]
+check_report_result() {
+    local report="$1"
+    local result="$2"
+    local policy="$3"
+
+    [[ $result =~ ^(pass|fail|null)$ ]]
+
+    # Policy was not set, check all results
+    if [ -z "$policy" ]; then
+        echo "$report" | jq -e --arg r $result '.results | all(.result == $r)'
+        return
+    fi
+
+    if [ "$result" == "null" ]; then
+        echo "$report" | jq -e --arg p $policy '.results | all(.policy != $p)'
+    else
+        echo "$report" | jq -e --arg p $policy --arg r $result '.results | all(select(.policy == $p) | .result == $r)'
+    fi
+}
+
 @test "[Audit Scanner] Install testing policies and resources" {
     # Make sure cronjob was created
     kubectl get cronjob -n kubewarden audit-scanner
@@ -20,94 +69,76 @@ setup() {
     # Create a namespace to trigger a fail evaluation in the audit scanner
     kubectl create ns testing-audit-scanner
     kubectl label ns testing-audit-scanner cost-center=123
-    
+
     # Deploy some policy
     kubectl apply -f $RESOURCES_DIR/privileged-pod-policy.yaml
     kubectl apply -f $RESOURCES_DIR/namespace-psa-label-enforcer-policy.yaml
     kubectl apply -f $RESOURCES_DIR/safe-labels-namespace.yaml
     apply_cluster_admission_policy $RESOURCES_DIR/safe-labels-pods-policy.yaml
-}
 
-@test "[Audit Scanner] Trigger audit scanner job" {
-    run kubectl create job  --from=cronjob/audit-scanner testing  --namespace $NAMESPACE
-    assert_output -p "testing created"
-    kubectl wait --for=condition="Complete" job testing --namespace $NAMESPACE
+    trigger_audit_scan
 }
 
 @test "[Audit Scanner] Check cluster wide report results" {
-    testing_namespace_uid=$(kubectl get ns testing-audit-scanner -o=json | jq -r ".metadata.uid")
-    local report=$(kubectl get clusterpolicyreports "$testing_namespace_uid" -o json | jq -ec)
-    echo "$report" | jq -e '.summary.pass == 1'
-    echo "$report" | jq -e '.summary.fail == 1'
-    echo "$report" | jq -e '[.results[] | select(.policy == "clusterwide-safe-labels")] | all(.result == "fail")'
-    echo "$report" | jq -e '[.results[] | select(.policy == "clusterwide-psa-label-enforcer-policy")] | all(.result == "pass")'
+    local r
 
-    default_namespace_uid=$(kubectl get ns default -o=json | jq -r ".metadata.uid")
-    local report=$(kubectl get clusterpolicyreports "$default_namespace_uid" -o json | jq -ec)
-    echo "$report" | jq -e '.summary.pass == 2'
-    echo "$report" | jq -e '.summary.fail == 0'
-    echo "$report" | jq -e '[.results[] | select(.result=="pass")] | all'
+    # Custom namespace should have failed the audit
+    r=$(get_report "ns/testing-audit-scanner")
+    check_report_summary "$r" 1 1
+    check_report_result "$r" fail clusterwide-safe-labels
+    check_report_result "$r" pass clusterwide-psa-label-enforcer-policy
+
+    # Default namespace should pass all checks
+    r=$(get_report "ns/default")
+    check_report_summary "$r" 2 0
+    check_report_result "$r" pass
+
+    # NS nginx-privileged should fail the audit
+    r=$(get_report pods/nginx-privileged)
+    check_report_summary "$r" 1 1
+    check_report_result "$r" fail clusterwide-privileged-pods
+    check_report_result "$r" pass clusterwide-safe-labels-for-pods
+
+    # NS nginx-unprivileged should pass the audit
+    r=$(get_report pods/nginx-unprivileged)
+    check_report_summary "$r" 2 0
+    check_report_result "$r" pass clusterwide-privileged-pods
+    check_report_result "$r" pass clusterwide-safe-labels-for-pods
 }
 
-@test "[Audit Scanner] Check namespaced report results" {
-    privileged_pod_uid=$(kubectl get pods nginx-privileged  -o=json | jq -r ".metadata.uid")
-    local report=$(kubectl get policyreports "$privileged_pod_uid" -o json | jq -ec)
-    echo "$report" | jq -e '.summary.fail == 1'
-    echo "$report" | jq -e '.summary.pass == 1'
-    echo "$report" | jq -e '[.results[] | select(.policy == "clusterwide-privileged-pods") | .result=="fail"] | all'
-    echo "$report" | jq -e '[.results[] | select(.policy == "clusterwide-safe-labels-for-pods") | .result=="pass"] | all'
-
-    unprivileged_pod_uid=$(kubectl get pods nginx-unprivileged  -o=json | jq -r ".metadata.uid")
-    local report=$(kubectl get policyreports "$unprivileged_pod_uid" -o json | jq -ec)
-    echo "$report" | jq -e '.summary.fail == 0'
-    echo "$report" | jq -e '.summary.pass == 2'
-    echo "$report" | jq -e '[.results[] | select(.policy == "clusterwide-privileged-pods") | .result=="pass"] | all'
-    echo "$report" | jq -e '[.results[] | select(.policy == "clusterwide-safe-labels-for-pods") | .result=="pass"] | all'
-
-}
-
-@test "[Audit Scanner] Delete some policies and retrigger audit scanner job" {
+@test "[Audit Scanner] Delete some policies and retrigger audit scan" {
     kubectl delete -f $RESOURCES_DIR/safe-labels-pods-policy.yaml
     kubectl delete -f $RESOURCES_DIR/namespace-psa-label-enforcer-policy.yaml
     wait_for_default_policy_server_rollout
-    
-    kubectl delete --ignore-not-found job testing --namespace $NAMESPACE
-    run kubectl create job  --from=cronjob/audit-scanner testing  --namespace $NAMESPACE
-    assert_success
-    assert_output -p "testing created"
-    kubectl wait --for=condition="Complete" job testing --namespace $NAMESPACE
+
+    trigger_audit_scan
 }
 
-@test "[Audit Scanner] Update cluster wide report results" {
-    testing_namespace_uid=$(kubectl get ns testing-audit-scanner -o=json | jq -r ".metadata.uid")
-    local report=$(kubectl get clusterpolicyreports "$testing_namespace_uid" -o json | jq -ec)
-    echo "$report" | jq -e '.summary.pass == 0'
-    echo "$report" | jq -e '.summary.fail == 1'
-    echo "$report" | jq -e '[.results[] | select(.policy == "clusterwide-safe-labels")] | all(.result == "fail")'
-    echo "$report" | jq '[.results[] | select(.policy == "clusterwide-psa-label-enforcer-policy")] | empty'
+@test "[Audit Scanner] Deleted ClusterAdmission policies are removed from audit results" {
+    local r
 
-    default_namespace_uid=$(kubectl get ns default -o=json | jq -r ".metadata.uid")
-    local report=$(kubectl get clusterpolicyreports "$default_namespace_uid" -o json | jq -ec)
-    echo "$report" | jq -e '.summary.pass == 1'
-    echo "$report" | jq -e '.summary.fail == 0'
-    echo "$report" | jq -e '[.results[] | select(.result=="pass")] | all'
-}
+    # Custom namespace pass removed
+    r=$(get_report ns/testing-audit-scanner)
+    check_report_summary "$r" 0 1
+    check_report_result "$r" fail clusterwide-safe-labels
+    check_report_result "$r" null clusterwide-psa-label-enforcer-policy
 
-@test "[Audit Scanner] Update namespaced policy reports after remove one policy" {
+    # Default namespace pass removed
+    r=$(get_report ns/default)
+    check_report_summary "$r" 1 0
+    check_report_result "$r" pass
 
-    unprivileged_pod_uid=$(kubectl get pods nginx-unprivileged  -o=json | jq -r ".metadata.uid")
-    local report=$(kubectl get policyreports "$unprivileged_pod_uid" -o json | jq -ec)
-    echo "$report" | jq -e '.summary.fail == 0'
-    echo "$report" | jq -e '.summary.pass == 1'
-    echo "$report" | jq -e '[.results[] | select(.policy == "clusterwide-privileged-pods") | .result=="pass"] | all'
-    echo "$report" | jq '[.results[] | select(.policy == "clusterwide-safe-labels-for-pods")] | empty'
+    # NS nginx-privileged pass removed
+    r=$(get_report "pods/nginx-privileged")
+    check_report_summary "$r" 0 1
+    check_report_result "$r" fail clusterwide-privileged-pods
+    check_report_result "$r" null clusterwide-safe-labels-for-pods
 
-    privileged_pod_uid=$(kubectl get pods nginx-privileged  -o=json | jq -r ".metadata.uid")
-    local report=$(kubectl get policyreports "$privileged_pod_uid" -o json | jq -ec)
-    echo "$report" | jq -e '.summary.fail == 1'
-    echo "$report" | jq -e '.summary.pass == 0'
-    echo "$report" | jq -e '[.results[] | select(.policy == "clusterwide-privileged-pods") | .result=="fail"] | all'
-    echo "$report" | jq '[.results[] | select(.policy == "clusterwide-safe-labels-for-pods")] | empty'
+    # NS nginx-unprivileged pass removed
+    r=$(get_report "pods/nginx-unprivileged")
+    check_report_summary "$r" 1 0
+    check_report_result "$r" pass clusterwide-privileged-pods
+    check_report_result "$r" null clusterwide-safe-labels-for-pods
 }
 
 @test "[Audit Scanner] Delete all policy reports after all relevant policies" {
@@ -115,14 +146,9 @@ setup() {
     kubectl delete -f $RESOURCES_DIR/safe-labels-namespace.yaml
     wait_for_default_policy_server_rollout
 
-    kubectl delete --ignore-not-found job testing --namespace $NAMESPACE
-    run kubectl create job  --from=cronjob/audit-scanner testing  --namespace $NAMESPACE
-    assert_success
-    assert_output -p "testing created"
-    kubectl wait --for=condition="Complete" job testing --namespace $NAMESPACE
-
-    retry "kubectl get --ignore-not-found policyreport -A -o json | jq -e '.items[] | empty'"
-    retry "kubectl get --ignore-not-found clusterpolicyreport -A -o json | jq -e '.items[] | empty'"
+    trigger_audit_scan
+    kubectl get policyreport -A 2>&1 | grep 'No resources found'
+    kubectl get clusterpolicyreport 2>&1 | grep 'No resources found'
 }
 
 teardown_file() {
@@ -133,5 +159,4 @@ teardown_file() {
     kubectl delete --ignore-not-found ns testing-audit-scanner
     kubectl delete --ignore-not-found pod nginx-privileged nginx-unprivileged
     kubectl delete --ignore-not-found jobs -n kubewarden testing
-
 }
