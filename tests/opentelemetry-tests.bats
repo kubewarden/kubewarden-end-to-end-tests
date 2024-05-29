@@ -66,7 +66,7 @@ setup() {
     kubectl wait --for=condition=Ready pod nginx-privileged
 
     # Deploy some policy
-    apply_cluster_admission_policy $RESOURCES_DIR/privileged-pod-policy.yaml
+    kubectl apply -f $RESOURCES_DIR/privileged-pod-policy.yaml
     apply_cluster_admission_policy $RESOURCES_DIR/namespace-label-propagator-policy.yaml
 
     run kubectl create job  --from=cronjob/audit-scanner testing  --namespace $NAMESPACE
