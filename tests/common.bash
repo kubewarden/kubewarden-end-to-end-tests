@@ -153,6 +153,5 @@ function wait_for_cluster_admission_policy {
 }
 
 function wait_for_default_policy_server_rollout {
-	revision=$(kubectl -n $NAMESPACE get "deployment/policy-server-default" -o json | jq -er '.metadata.annotations."deployment.kubernetes.io/revision"')
-	wait_rollout -n $NAMESPACE --revision $revision "deployment/policy-server-default"
+	wait_rollout -n $NAMESPACE  "deployment/policy-server-default"
 }
