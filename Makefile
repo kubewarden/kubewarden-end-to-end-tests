@@ -59,7 +59,7 @@ bats = RESOURCES_DIR=$(RESOURCES_DIR) \
 	CONTROLLER_CHART=$(CONTROLLER_CHART) \
 	CLUSTER_CONTEXT=$(CLUSTER_CONTEXT) \
 	NAMESPACE=$(NAMESPACE) \
-		bats --print-output-on-failure $(1)
+		bats -T --print-output-on-failure --show-output-of-passing-tests $(1)
 
 helm_in = $(helm) upgrade --install --wait --namespace $(NAMESPACE) --create-namespace
 
