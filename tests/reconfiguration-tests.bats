@@ -16,12 +16,12 @@ teardown_file() {
 }
 
 @test "[Reconfiguration tests] Reconfigure Kubewarden stack" {
-	helm_up kubewarden-controller --values=$RESOURCES_DIR/reconfiguration-values.yaml
+	helm_up kubewarden-controller --values=$RESOURCES_DIR/reconfiguration-values.yaml --reuse-values
 	wait_for_cluster_admission_policy PolicyActive
 }
 
 @test "[Reconfiguration tests] Apply psp-user-group policy" {
-	apply_cluster_admission_policy $RESOURCES_DIR/psp-user-group-policy.yaml
+	apply_admission_policy $RESOURCES_DIR/psp-user-group-policy.yaml
 }
 
 @test "[Reconfiguration tests] Test that pod-privileged policy works" {
