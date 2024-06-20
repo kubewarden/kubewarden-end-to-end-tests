@@ -31,7 +31,7 @@ setup() {
     wait_pods -n jaeger
 
     # Setup Kubewarden
-    helm_up kubewarden-controller --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml
+    helm_up kubewarden-controller --reuse-values --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml
     helm_up kubewarden-defaults --set "recommendedPolicies.enabled=True"
 }
 
@@ -77,7 +77,7 @@ setup() {
 }
 
 @test "[OpenTelemetry] Disabling telemetry should remove sidecars & metrics" {
-    helm_up kubewarden-controller --set "telemetry.enabled=False"
+    helm_up kubewarden-controller --set "telemetry.metrics.enabled=False" --set "telemetry.tracing.enabled=False" --reuse-values
     helm_up kubewarden-defaults --set "recommendedPolicies.enabled=True"
     wait_pods -n kubewarden
 
