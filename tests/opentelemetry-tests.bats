@@ -27,6 +27,10 @@ setup() {
     helm upgrade -i --wait jaeger-operator jaegertracing/jaeger-operator \
         -n jaeger --create-namespace \
         --set rbac.clusterRole=true
+
+    # workaround for https://github.com/jaegertracing/helm-charts/issues/549
+    kubectl patch clusterrole jaeger-operator --patch "$(cat $RESOURCES_DIR/opentelemetry-jaeger-rbac-workaround.yaml)"
+
     kubectl apply -f $RESOURCES_DIR/opentelemetry-jaeger.yaml
     wait_pods -n jaeger
 
