@@ -19,7 +19,7 @@ function get_metrics {
     ns=${2:-$NAMESPACE}
 
     kubectl delete pod curlpod --ignore-not-found
-    kubectl run curlpod -t -i --rm --wait --image curlimages/curl:8.00.1 --restart=Never -- \
+    kubectl run curlpod -t -i --rm --image curlimages/curl:8.00.1 --restart=Never -- \
         --silent $pod.$ns.svc.cluster.local:8080/metrics
 }
 

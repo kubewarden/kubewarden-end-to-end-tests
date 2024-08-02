@@ -29,7 +29,9 @@ setup() {
         --set rbac.clusterRole=true
 
     # workaround for https://github.com/jaegertracing/helm-charts/issues/549
-    kubectl patch clusterrole jaeger-operator --patch "$(cat $RESOURCES_DIR/opentelemetry-jaeger-rbac-workaround.yaml)"
+    kubectl patch clusterrole jaeger-operator --type='json' \
+        -p '[{"op": "add", "path": "/rules/-", "value": {"apiGroups": ["networking.k8s.io"], "resources": ["ingressclasses"], "verbs": ["get", "list"]}}]'
+
 
     kubectl apply -f $RESOURCES_DIR/opentelemetry-jaeger.yaml
     wait_pods -n jaeger
