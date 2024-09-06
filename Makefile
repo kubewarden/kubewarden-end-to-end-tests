@@ -15,22 +15,22 @@ TIMEOUT ?= 5m
 KUBEWARDEN_CHARTS_LOCATION ?= kubewarden
 CONTROLLER_CHART ?= $(KUBEWARDEN_CHARTS_LOCATION)/kubewarden-controller
 NAMESPACE ?= kubewarden
-K3D_VERSION ?= v5.4.4
+K3D_VERSION ?= v5.7.3
 # helm repo name used to download the Helm charts.
 KUBEWARDEN_HELM_REPO_NAME ?= kubewarden
 # URL where the Helm charts are stored
 KUBEWARDEN_HELM_REPO_URL ?= https://charts.kubewarden.io
 
-KUBEWARDEN_CONTROLLER_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) --versions -o json --devel | jq -r ".[0].version")
-KUBEWARDEN_CONTROLLER_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) --versions -o json --devel | jq -r ".[1].version")
+KUBEWARDEN_CONTROLLER_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) -o json --devel | jq -r ".[0].version")
+KUBEWARDEN_CONTROLLER_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CONTROLLER_CHART_RELEASE) -o json --versions | jq -r ".[1].version")
 KUBEWARDEN_CONTROLLER_CHART_RELEASE ?= kubewarden-controller
-KUBEWARDEN_CRDS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE) --versions -o json --devel | jq -r ".[0].version")
-KUBEWARDEN_CRDS_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE) --versions -o json --devel | jq -r ".[1].version")
+KUBEWARDEN_CRDS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE) -o json --devel | jq -r ".[0].version")
+KUBEWARDEN_CRDS_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_CRDS_CHART_RELEASE) -o json --versions | jq -r ".[1].version")
 KUBEWARDEN_CRDS_CHART_RELEASE ?= kubewarden-crds
-KUBEWARDEN_DEFAULTS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json --devel | jq -r ".[0].version")
-KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --versions -o json --devel | jq -r ".[1].version")
+KUBEWARDEN_DEFAULTS_CHART_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) -o json --devel | jq -r ".[0].version")
+KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION ?= $(shell helm search repo $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) -o json --versions | jq -r ".[1].version")
 KUBEWARDEN_DEFAULTS_CHART_RELEASE ?= kubewarden-defaults
-CERT_MANAGER_VERSION ?= v1.11.0
+CERT_MANAGER_VERSION ?= v1.15.1
 #
 # CRD version to be tested
 CRD_VERSION ?= $(shell helm show values $(KUBEWARDEN_HELM_REPO_NAME)/$(KUBEWARDEN_DEFAULTS_CHART_RELEASE) --version $(KUBEWARDEN_DEFAULTS_CHART_VERSION) | yq -r ".crdVersion")
@@ -59,7 +59,7 @@ bats = RESOURCES_DIR=$(RESOURCES_DIR) \
 	CONTROLLER_CHART=$(CONTROLLER_CHART) \
 	CLUSTER_CONTEXT=$(CLUSTER_CONTEXT) \
 	NAMESPACE=$(NAMESPACE) \
-		bats -T --print-output-on-failure --show-output-of-passing-tests $(1)
+		bats -T --print-output-on-failure $(1)
 
 helm_in = $(helm) upgrade --install --wait --namespace $(NAMESPACE) --create-namespace
 
@@ -109,7 +109,7 @@ tests: $(filter-out upgrade.bats audit-scanner-installation.bats, $(TESTS))
 .PHONY: cluster install reinstall clean
 
 cluster:
-	k3d cluster create $(CLUSTER_NAME) -s 1 -a 1 --wait --timeout $(TIMEOUT) -v /dev/mapper:/dev/mapper --image rancher/k3s:v1.27.12-k3s1
+	k3d cluster create $(CLUSTER_NAME) -s 1 -a 1 --wait --timeout $(TIMEOUT) -v /dev/mapper:/dev/mapper
 	$(kube) wait --for=condition=Ready nodes --all
 
 install:
