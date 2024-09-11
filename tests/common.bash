@@ -35,7 +35,7 @@ function helm_up {
             def_version=$KUBEWARDEN_CRDS_CHART_VERSION;;
     esac
 
-    helm upgrade --version $def_version --wait \
+    helm upgrade --version "$def_version" --wait \
         --namespace $NAMESPACE --create-namespace \
         "${@:2}" $1 $KUBEWARDEN_CHARTS_LOCATION/$1
 

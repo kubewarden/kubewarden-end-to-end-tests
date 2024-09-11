@@ -27,12 +27,15 @@ function check_default_policies {
     run -1 kubectl run pod-privileged --image=registry.k8s.io/pause --privileged
 }
 
-
 @test "[CRD upgrade] Install old Kubewarden" {
+    # Required by Kubewarden <= v1.16.0
+    helm repo add jetstack https://charts.jetstack.io --force-update
+    helm upgrade -i --wait cert-manager jetstack/cert-manager -n cert-manager --create-namespace --set crds.enabled=true
+
     # Install old kubewarden version
-    helm_in kubewarden-crds --version $KUBEWARDEN_CRDS_CHART_OLD_VERSION
-    helm_in kubewarden-controller --version $KUBEWARDEN_CONTROLLER_CHART_OLD_VERSION
-    helm_in kubewarden-defaults --version $KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION \
+    KUBEWARDEN_CHARTS_LOCATION="$KUBEWARDEN_HELM_REPO_NAME" helm_in kubewarden-crds --version $KUBEWARDEN_CRDS_CHART_OLD_VERSION
+    KUBEWARDEN_CHARTS_LOCATION="$KUBEWARDEN_HELM_REPO_NAME" helm_in kubewarden-controller --version $KUBEWARDEN_CONTROLLER_CHART_OLD_VERSION
+    KUBEWARDEN_CHARTS_LOCATION="$KUBEWARDEN_HELM_REPO_NAME" helm_in kubewarden-defaults --version $KUBEWARDEN_DEFAULTS_CHART_OLD_VERSION \
         --set recommendedPolicies.enabled=True \
         --set recommendedPolicies.defaultPolicyMode=protect
     check_default_policies
@@ -43,6 +46,9 @@ function check_default_policies {
     helm_up kubewarden-controller --version $KUBEWARDEN_CONTROLLER_CHART_VERSION
     helm_up kubewarden-defaults --version $KUBEWARDEN_DEFAULTS_CHART_VERSION
     check_default_policies
+    # Not required by Kubewarden >= v1.17.0
+    # Cert-manager versions prior to v1.15.0 do not keep the CustomResourceDefinition on uninstall
+    helm uninstall cert-manager -n cert-manager
 }
 
 @test "[CRD upgrade] Check old policy CRD version is translated to new" {

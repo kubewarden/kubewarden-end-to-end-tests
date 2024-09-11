@@ -95,8 +95,8 @@ teardown_file() {
 	policy="$BATS_RUN_TMPDIR/private-policy.yaml"
 
 	kwctl scaffold manifest --type=ClusterAdmissionPolicy $PUB_POLICY |\
-		yq -y '.metadata.name = "private-pod-privileged"' |\
-		yq -y --arg r $PRIV_POLICY '.spec.module = $r' > $policy
+		yq '.metadata.name = "private-pod-privileged"' |\
+		PP=$PRIV_POLICY yq '.spec.module = strenv(PP)' > $policy
 
 	# Make sure we use private registry
 	grep -F "module: registry://$REGISTRY" $policy
