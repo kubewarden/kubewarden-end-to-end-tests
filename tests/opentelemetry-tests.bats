@@ -10,6 +10,12 @@ setup() {
 }
 
 @test "[OpenTelemetry] Install OpenTelemetry, Prometheus, Jaeger" {
+    # Required by OpenTelemetry
+    helm repo add jetstack https://charts.jetstack.io --force-update
+    helm upgrade -i --wait cert-manager jetstack/cert-manager \
+        -n cert-manager --create-namespace \
+        --set crds.enabled=true
+
     # OpemTelementry
     helm repo add --force-update open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
     helm upgrade -i --wait my-opentelemetry-operator open-telemetry/opentelemetry-operator \
@@ -91,9 +97,16 @@ setup() {
 }
 
 teardown_file() {
+    load common.bash
+    # Remove installed apps
+    helm uninstall --wait -n jaeger jaeger-operator
+    helm uninstall --wait -n prometheus prometheus
+    helm uninstall --wait -n open-telemetry my-opentelemetry-operator
+    helm uninstall --wait -n cert-manager cert-manager
+
     # Resources might be already deleted by helm update
     kubectl delete -f $RESOURCES_DIR/privileged-pod-policy.yaml --ignore-not-found
-    kubectl delete -f $RESOURCES_DIR/namespace-label-propagator-policy.yaml  --ignore-not-found
+    kubectl delete -f $RESOURCES_DIR/namespace-label-propagator-policy.yaml --ignore-not-found
     kubectl delete pod nginx-privileged nginx-unprivileged --ignore-not-found
     kubectl delete jobs -n kubewarden testing --ignore-not-found
 }

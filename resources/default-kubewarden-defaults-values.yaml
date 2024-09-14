@@ -1,6 +1,0 @@
-#policyServer:
-#  image:
-#    repository: "ghcr.io/myuser/policy-server"
-#    tag: "latest"
-recommendedPolicies:
-  enabled: False

@@ -30,7 +30,7 @@ Other required dependencies:
 curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 
 # yq - python yq has different syntax then mikefarah binary
-pip3 install yq
+Use mikefarah binary, github-runners and zypper default to it
 
 # Also kubectl, helm, docker, ...
 ```
@@ -43,7 +43,7 @@ run the tasks:
 ```bash
 make clean   # to remove previous k3d cluster
 make cluster # to create new k3d cluster
-make install # to install kubewarden (and cert-manager)
+make install # to install kubewarden
 
 # or you can group 3 steps above into
 make reinstall
