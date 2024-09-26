@@ -1,15 +1,15 @@
 #!/usr/bin/env bats
 
 setup() {
-    load common.bash
+    load ../helpers/helpers.sh
     wait_pods -n kube-system
 }
 
-trigger_audit_scan() {
-    local jobname=${1:-testing}
-    kubectl delete --ignore-not-found job $jobname --namespace $NAMESPACE
-    kubectl create job  --from=cronjob/audit-scanner $jobname  --namespace $NAMESPACE | grep "$jobname created"
-    kubectl wait --for=condition="Complete" job $jobname --namespace $NAMESPACE
+teardown_file() {
+    load ../helpers/helpers.sh
+    kubectl delete pods --all
+    kubectl delete admissionpolicies,clusteradmissionpolicies --all -A
+    kubectl delete ns testing-audit-scanner --ignore-not-found
 }
 
 # get_report "pod/podname"
@@ -18,9 +18,9 @@ get_report() {
     # Find resource UID
     local ruid=$(kubectl get $resource -o jsonpath='{.metadata.uid}')
     # Figure out if resource report is namespaced or not
-    kubectl api-resources --namespaced=false | grep -qw ${resource%/*} && rtype=cpolr || rtype=polr
+    kubectl api-resources --no-headers --namespaced=false | grep -w ${resource%/*} >/dev/null && rtype=cpolr || rtype=polr
     # Print resource report
-    kubectl get $rtype $ruid -o json
+    kubectl get $rtype $ruid -o json | jq -c '.'
 }
 
 # check_report_summary "$report" 2 0
@@ -37,7 +37,7 @@ check_report_summary() {
 check_report_result() {
     local report="$1"
     local result="$2"
-    local policy="$3"
+    local policy="${3:-}"
 
     [[ $result =~ ^(pass|fail|null)$ ]]
 
@@ -56,7 +56,7 @@ check_report_result() {
 
 @test "[Audit Scanner] Install testing policies and resources" {
     # Make sure cronjob was created
-    kubectl get cronjob -n kubewarden audit-scanner
+    kubectl get cronjob -n $NAMESPACE audit-scanner
 
     # Launch unprivileged pod
     kubectl run nginx-unprivileged --image=nginx:alpine
@@ -70,11 +70,11 @@ check_report_result() {
     kubectl create ns testing-audit-scanner
     kubectl label ns testing-audit-scanner cost-center=123
 
-    # Deploy some policy
-    kubectl apply -f $RESOURCES_DIR/privileged-pod-policy.yaml
-    kubectl apply -f $RESOURCES_DIR/namespace-psa-label-enforcer-policy.yaml
-    kubectl apply -f $RESOURCES_DIR/safe-labels-namespace.yaml
-    apply_cluster_admission_policy $RESOURCES_DIR/safe-labels-pods-policy.yaml
+    # Deploy some policies
+    apply_policy --no-wait privileged-pod-policy.yaml
+    apply_policy --no-wait namespace-psa-label-enforcer-policy.yaml
+    apply_policy --no-wait safe-labels-namespace.yaml
+    apply_policy safe-labels-pods-policy.yaml
 
     trigger_audit_scan
 }
@@ -107,9 +107,9 @@ check_report_result() {
 }
 
 @test "[Audit Scanner] Delete some policies and retrigger audit scan" {
-    kubectl delete -f $RESOURCES_DIR/safe-labels-pods-policy.yaml
-    kubectl delete -f $RESOURCES_DIR/namespace-psa-label-enforcer-policy.yaml
-    wait_for_default_policy_server_rollout
+    delete_policy safe-labels-pods-policy.yaml
+    delete_policy namespace-psa-label-enforcer-policy.yaml
+    wait_policyserver
 
     trigger_audit_scan
 }
@@ -142,21 +142,11 @@ check_report_result() {
 }
 
 @test "[Audit Scanner] Delete all policy reports after all relevant policies" {
-    kubectl delete -f $RESOURCES_DIR/privileged-pod-policy.yaml
-    kubectl delete -f $RESOURCES_DIR/safe-labels-namespace.yaml
-    wait_for_default_policy_server_rollout
+    delete_policy privileged-pod-policy.yaml
+    delete_policy safe-labels-namespace.yaml
+    wait_policyserver
 
     trigger_audit_scan
     kubectl get policyreport -A 2>&1 | grep 'No resources found'
     kubectl get clusterpolicyreport 2>&1 | grep 'No resources found'
-}
-
-teardown_file() {
-    kubectl delete --ignore-not-found -f $RESOURCES_DIR/privileged-pod-policy.yaml
-    kubectl delete --ignore-not-found -f $RESOURCES_DIR/namespace-label-propagator-policy.yaml
-    kubectl delete --ignore-not-found -f $RESOURCES_DIR/safe-labels-namespace.yaml
-    kubectl delete --ignore-not-found -f $RESOURCES_DIR/safe-labels-pods-policy.yaml
-    kubectl delete --ignore-not-found ns testing-audit-scanner
-    kubectl delete --ignore-not-found pod nginx-privileged nginx-unprivileged
-    kubectl delete --ignore-not-found jobs -n kubewarden testing
 }
