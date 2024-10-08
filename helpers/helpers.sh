@@ -75,8 +75,12 @@ function delete_policy {
 
 # wait_policies [condition] - at least one policy must exist
 function wait_policies {
+    local resources="admissionpolicies,clusteradmissionpolicies"
+    # Policy groups were added in Kubewarden >= v1.17.0
+    kw_version ">=1.17" && resources+=",admissionpolicygroups,clusteradmissionpolicygroups"
+
     for chart in ${1:-PolicyActive PolicyUniquelyReachable}; do
-        wait_for --for=condition="$1" admissionpolicies,clusteradmissionpolicies,admissionpolicygroups,clusteradmissionpolicygroups --all -A
+        wait_for --for=condition="$1" "$resources" --all -A
     done
 }
 
