@@ -5,9 +5,34 @@
 # kubectl port-forward -n jaeger svc/my-open-telemetry-query 16686:16686
 
 setup() {
-  load common.bash
-  wait_pods -n kube-system
+    load ../helpers/helpers.sh
+    wait_pods -n kube-system
 }
+
+teardown_file() {
+    load ../helpers/helpers.sh
+    kubectl delete admissionpolicies,clusteradmissionpolicies --all -A
+    kubectl delete pod nginx-privileged nginx-unprivileged --ignore-not-found
+
+    # Remove installed apps
+    helm uninstall --wait -n jaeger jaeger-operator
+    helm uninstall --wait -n prometheus prometheus
+    helm uninstall --wait -n open-telemetry my-opentelemetry-operator
+    helm uninstall --wait -n cert-manager cert-manager
+
+    helmer reset controller
+}
+
+# get_metrics policy-server-default
+function get_metrics {
+    pod=$1
+    ns=${2:-$NAMESPACE}
+
+    kubectl delete pod curlpod --ignore-not-found
+    kubectl run curlpod -t -i --rm --image curlimages/curl:8.10.1 --restart=Never -- \
+        --silent $pod.$ns.svc.cluster.local:8080/metrics
+}
+export -f get_metrics # required by retry command
 
 @test "[OpenTelemetry] Install OpenTelemetry, Prometheus, Jaeger" {
     # Required by OpenTelemetry
@@ -24,9 +49,9 @@ setup() {
 
     # Prometheus
     helm repo add --force-update prometheus-community https://prometheus-community.github.io/helm-charts
-    helm upgrade -i --wait  prometheus prometheus-community/kube-prometheus-stack \
+    helm upgrade -i --wait prometheus prometheus-community/kube-prometheus-stack \
         -n prometheus --create-namespace \
-        --values $RESOURCES_DIR/opentelemetry-prometheus-values.yaml
+        --values $RESOURCES_DIR/opentelemetry-prometheus.yaml
 
     # Jaeger
     helm repo add --force-update jaegertracing https://jaegertracing.github.io/helm-charts
@@ -38,20 +63,20 @@ setup() {
     wait_pods -n jaeger
 
     # Setup Kubewarden
-    helm_up kubewarden-controller --values $RESOURCES_DIR/opentelemetry-kw-telemetry-values.yaml
-    helm_up kubewarden-defaults --set "recommendedPolicies.enabled=True"
+    helmer set kubewarden-controller --values $RESOURCES_DIR/opentelemetry-telemetry.yaml
+    helmer set kubewarden-defaults --set recommendedPolicies.enabled=True
 }
 
 @test "[OpenTelemetry] Kubewarden containers have sidecars & metrics" {
     # Controller is restarted to get sidecar
-    wait_pods -n kubewarden
+    wait_pods -n $NAMESPACE
 
     # Check all pods have sidecar (otc-container) - might take a minute to start
     retry "kubectl get pods -n kubewarden --field-selector=status.phase==Running -o json | jq -e '[.items[].spec.containers[1].name == \"otc-container\"] | all'"
     # Policy server service has the metrics ports
-    kubectl get services -n kubewarden  policy-server-default -o json | jq -e '[.spec.ports[].name == "metrics"] | any'
+    kubectl get services -n $NAMESPACE  policy-server-default -o json | jq -e '[.spec.ports[].name == "metrics"] | any'
     # Controller service has the metrics ports
-    kubectl get services -n kubewarden kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name == "metrics"] | any'
+    kubectl get services -n $NAMESPACE kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name == "metrics"] | any'
 
     # Generate metric data
     kubectl run pod-privileged --image=registry.k8s.io/pause --privileged
@@ -73,40 +98,24 @@ setup() {
     kubectl wait --for=condition=Ready pod nginx-privileged
 
     # Deploy some policy
-    kubectl apply -f $RESOURCES_DIR/privileged-pod-policy.yaml
-    apply_cluster_admission_policy $RESOURCES_DIR/namespace-label-propagator-policy.yaml
+    apply_policy --no-wait privileged-pod-policy.yaml
+    apply_policy namespace-label-propagator-policy.yaml
 
-    run kubectl create job  --from=cronjob/audit-scanner testing  --namespace $NAMESPACE
-    assert_output -p "testing created"
-    kubectl wait --for=condition="Complete" job testing --namespace $NAMESPACE
-
+    trigger_audit_scan
     retry 'test $(get_metrics policy-server-default | grep protect | grep -oE "policy_name=\"[^\"]+" | sort -u | wc -l) -eq 2'
 }
 
 @test "[OpenTelemetry] Disabling telemetry should remove sidecars & metrics" {
-    helm_up kubewarden-controller --set "telemetry.enabled=False"
-    helm_up kubewarden-defaults --set "recommendedPolicies.enabled=True"
-    wait_pods -n kubewarden
+    helmer set kubewarden-controller \
+        --set telemetry.metrics.enabled=False \
+        --set telemetry.tracing.enabled=False
+    helmer set kubewarden-defaults --set recommendedPolicies.enabled=False
+    wait_pods -n $NAMESPACE
 
     # Check sidecars (otc-container) - have been removed
     retry "kubectl get pods -n kubewarden -o json | jq -e '[.items[].spec.containers[1].name != \"otc-container\"] | all'"
     # Policy server service has no metrics ports
-    kubectl get services -n kubewarden policy-server-default -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
+    kubectl get services -n $NAMESPACE policy-server-default -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
     # Controller service has no metrics ports
-    kubectl get services -n kubewarden kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
-}
-
-teardown_file() {
-    load common.bash
-    # Remove installed apps
-    helm uninstall --wait -n jaeger jaeger-operator
-    helm uninstall --wait -n prometheus prometheus
-    helm uninstall --wait -n open-telemetry my-opentelemetry-operator
-    helm uninstall --wait -n cert-manager cert-manager
-
-    # Resources might be already deleted by helm update
-    kubectl delete -f $RESOURCES_DIR/privileged-pod-policy.yaml --ignore-not-found
-    kubectl delete -f $RESOURCES_DIR/namespace-label-propagator-policy.yaml --ignore-not-found
-    kubectl delete pod nginx-privileged nginx-unprivileged --ignore-not-found
-    kubectl delete jobs -n kubewarden testing --ignore-not-found
+    kubectl get services -n $NAMESPACE kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
 }
