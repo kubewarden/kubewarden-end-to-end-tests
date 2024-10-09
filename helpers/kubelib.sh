@@ -20,14 +20,19 @@ jq() { command jq -e "$@"; }
 export -f yq jq
 
 function retry() {
-    local cmd=$1
-    local tries=${2:-15}
-    local delay=${3:-20}
-    local i
+    local cmd="$1"
+    local tries="${2:-20}"
+    local delay="${3:-15}"
+    local i status
 
     for ((i=1; i<=tries; i++)); do
-        timeout 25 bash -c "$cmd" && break || echo "RETRY #$i: $cmd"
-        [ $i -ne $tries ] && sleep $delay || { echo "Godot: $cmd"; false; }
+        timeout $delay bash -c "$cmd" && break || status=$?
+        if [[ $i -lt $tries ]]; then
+            echo "RETRY #$i: $cmd"
+            [[ $status -ne 124 ]] && sleep $delay
+        else
+            echo "Godot ($status): $cmd"; false
+        fi
     done
 }
 
@@ -35,10 +40,10 @@ function retry() {
 # Handles kube-api disconnects during upgrade
 function wait_pods() {
     local i output
-    for i in {1..20}; do
+    for i in {1..30}; do
         output=$(kubectl get pods --no-headers -o wide ${@:--n kubewarden} | grep -vw Completed || echo 'Fail')
         grep -vE '([0-9]+)/\1 +Running' <<< $output || break
-        [ $i -ne 20 ] && sleep 30 || { echo "Godot: pods not running"; false; }
+        [ $i -ne 30 ] && sleep 15 || { echo "Godot: pods not running"; false; }
     done
 }
 
@@ -62,3 +67,37 @@ function wait_cluster() {
     wait_nodes
     wait_pods
 }
+
+
+# ==================================================================================================
+# Version helpers
+
+eq() { [[ "$1" == "$2"* ]]; } # Check if $1 starts with $2
+le() { printf '%s\n' "$1" "$2" | sed '/-/!{s/$/_/}' | sort -V -C; } # sed _ to sort RC < Release
+ge() { printf '%s\n' "$1" "$2" | sed '/-/!{s/$/_/}' | sort -V -C -r; }
+gt() { ! le "$1" "$2"; }
+lt() { ! ge "$1" "$2"; }
+
+# Check if current version satisfies query (semver.satifies)
+# $1: version query (e.g., ">=1.17", "<1.17.0", "=1.17.0-rc2")
+# $2: current version (e.g., "1.17.0-rc1")
+is_version() {
+    local qsign="${1%%[0-9]*}"  # Extract sign (e.g., ">=", "=", etc.)
+    local qver="${1#"$qsign"}"  # Remove sign from version (e.g., "1.17.0")
+    local current="${2/#v}"     # Current version, strip the leading 'v'
+
+    # Append ".0" to partial qver (or 1.17.0 > 1.17)
+    [[ "$qver" =~ ^[0-9]+\.[0-9]+$ ]] && qver="${qver}.0"
+    # Strip -rc from current version if not querying RC (or 1.17.0-rc2 < 1.17.0)
+    [[ "$qver" != *-rc* ]] && current="${current%-rc*}"
+
+    case "$qsign" in
+        *">"*) gt "$current" "$qver" && return 0 ;;&
+        *"<"*) lt "$current" "$qver" && return 0 ;;&
+        *"="*) eq "$current" "$qver" && return 0 ;;&
+    esac
+    return 1
+}
+
+# Query against installed kubewarden app version
+kw_version() { is_version "$1" "$(helm ls -n $NAMESPACE -f kubewarden-crds -o json | jq -r '.[0].app_version')"; }
