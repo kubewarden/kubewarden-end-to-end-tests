@@ -82,7 +82,7 @@ tests on a cluster already in place, you need to define the context:
 CLUSTER_CONTEXT=k3d-mycluster make basic-end-to-end-test.bats
 ```
 
-Also check the Kubewarden controller repository to see how run this test in a [Github
+Also check the helm-charts repository to see how run this test in a [Github
 workflow](https://github.com/kubewarden/helm-charts/blob/main/.github/workflows/e2e-tests.yml)
 
 ## Updating policies
