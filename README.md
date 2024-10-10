@@ -1,6 +1,9 @@
 [![Kubewarden Infra Repository](https://github.com/kubewarden/community/blob/main/badges/kubewarden-infra.svg)](https://github.com/kubewarden/community/blob/main/REPOSITORIES.md#infra-scope)
 [![Stable](https://img.shields.io/badge/status-stable-brightgreen?style=for-the-badge)](https://github.com/kubewarden/community/blob/main/REPOSITORIES.md#stable)
 
+[![E2E](https://github.com/kubewarden/ui/actions/workflows/playwright.yml/badge.svg?event=schedule)](https://github.com/kubewarden/ui/actions/workflows/playwright.yml?query=event%3Aschedule)
+[![E2E](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-tests.yml/badge.svg?event=schedule)](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-tests.yml?query=event%3Aschedule)
+
 # kubewarden-end-to-end-tests
 
 This repository contains all the files necessary to run Kubewarden
@@ -32,7 +35,8 @@ curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 # yq - python yq has different syntax then mikefarah binary
 Use mikefarah binary, github-runners and zypper default to it
 
-# Also kubectl, helm, docker, ...
+# Also kubectl, helm, docker, ...you can run:
+make check
 ```
 
 ## Setting up cluster & kubewarden
@@ -41,36 +45,34 @@ The Makefile has many targets to make easier to setup a test environment and
 run the tasks:
 
 ```bash
-make clean   # to remove previous k3d cluster
-make cluster # to create new k3d cluster
-make install # to install kubewarden
 
-# or you can group 3 steps above into
-make reinstall
+# Install :latest images and custom args
+make
+  cluster K3S=1.30 \
+  install LATEST=1 DEFAULTS_ARGS="--set recommendedPolicies.enabled=True" CONTROLLER_ARGS="-f custom.yaml"
 
-# Optionally you can specify versions, see top of the Makefile for options
-KUBEWARDEN_CRDS_CHART_VERSION=1.3.0-rc6 \
-KUBEWARDEN_CONTROLLER_CHART_VERSION=1.5.0-rc6 \
-KUBEWARDEN_DEFAULTS_CHART_VERSION=1.6.0-rc7 \
-  make install
+# Install from local directory
+ln -s ../helm-charts/charts
+make cluster install CHARTS_LOCATION=./charts
+
+# Install previous stable version upgrade to local chart
+make cluster install VERSION=prev
+make upgrade CHARTS_LOCATION=./charts
+
+# Delete cluster
+make clean
 ```
 
 ## Running the tests
 
-Once you have a cluster with Kubewarden install, you can run the basic
-e2e tests.
+Once you have a cluster with Kubewarden install, you can run tests.
 
 ```bash
-# All non-destructive tests have target auto-generated from filename
+# All testfiles have target auto-generated from filename
 make monitor-mode-tests.bats reconfiguration-tests.bats
 
-# There is also a target that groups all of them
+# Run all tests
 make tests
-
-# Upgrade tests is special since it reinstalls cluster
-# It does not require cluster & kubewarden setup steps
-make upgrade.bats
-
 ```
 
 All the tests run on a given `kubectl` context. Thus, if you want to run the
@@ -80,8 +82,8 @@ tests on a cluster already in place, you need to define the context:
 CLUSTER_CONTEXT=k3d-mycluster make basic-end-to-end-test.bats
 ```
 
-Also check the Kubewarden controller repository to see how run this test in a [Github
-workflow](https://github.com/kubewarden/kubewarden-controller/blob/main/.github/workflows/e2e-tests.yml)
+Also check the helm-charts repository to see how run this test in a [Github
+workflow](https://github.com/kubewarden/helm-charts/blob/main/.github/workflows/e2e-tests.yml)
 
 ## Updating policies
 
