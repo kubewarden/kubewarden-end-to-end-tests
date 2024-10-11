@@ -1,8 +1,17 @@
 [![Kubewarden Infra Repository](https://github.com/kubewarden/community/blob/main/badges/kubewarden-infra.svg)](https://github.com/kubewarden/community/blob/main/REPOSITORIES.md#infra-scope)
 [![Stable](https://img.shields.io/badge/status-stable-brightgreen?style=for-the-badge)](https://github.com/kubewarden/community/blob/main/REPOSITORIES.md#stable)
 
-[![E2E](https://github.com/kubewarden/ui/actions/workflows/playwright.yml/badge.svg?event=schedule)](https://github.com/kubewarden/ui/actions/workflows/playwright.yml?query=event%3Aschedule)
-[![E2E](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-tests.yml/badge.svg?event=schedule)](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-tests.yml?query=event%3Aschedule)
+## [Charts test matrix](https://github.com/kubewarden/helm-charts/blob/main/.github/workflows/e2e-tests.yml)
+
+| Trigger            	| Charts          	| K3S 	| Notes               	| Status 	|
+|--------------------	|-----------------	|-----	|----------------------	| :--------: |
+| nightly (schedule) 	| latest tag      	| k3d 	|                      	| [![E2E](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-tests.yml/badge.svg?event=schedule)](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-tests.yml?query=event%3Aschedule) |
+|                    	| source (main)   	| k3d 	| :latest images       	|  |
+| release (tag)      	| release tag     	| k3d 	|                      	| [![E2E](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-tests.yml/badge.svg?event=workflow_run)](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-tests.yml?query=event%3Aworkflow_run) |
+|                    	| previous stable 	| k3d 	| upgrade to released  	|  |
+|                    	| release tag     	| old 	| oldest supported k8s 	|  |
+| pull request       	| source (pr)     	| k3d 	|                      	|  |
+| manual             	| any             	| any 	| any                  	|  |
 
 # kubewarden-end-to-end-tests
 
