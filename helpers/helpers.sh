@@ -49,16 +49,20 @@ policypath() { [[ "$1" == */* ]] && echo "$1" || echo "$RESOURCES_DIR/policies/$
 function apply_policy {
     [ "${1:-}" = '--no-wait' ] && local nowait=true && shift
 
-    # Handle policy yaml from pipe (-p /dev/stdin fails on github runner)
-    if [ $# -eq 0 ]; then
-        local tempfile=$(mktemp -p "$BATS_RUN_TMPDIR" policy-XXXXX.yaml)
-        cat > "$tempfile"
+    local pfile
+    if [[ $# -eq 0 || "$1" == -* ]]; then
+        # Policy yaml from pipe (-p /dev/stdin fails on github runner)
+        pfile=$(mktemp -p "$BATS_RUN_TMPDIR" policy-XXXXX.yaml)
+        cat > "$pfile"
+    else
+        # Policy from resource file
+        pfile=$(policypath "$1")
+        shift
     fi
 
-    # Apply the policy and delete tempfile
-    local pfile=${tempfile:-$(policypath "$1")}
+    # Find policy kind and apply
     local kind=$(yq '.kind' "$pfile")
-    kubectl apply -f "$pfile"
+    kubectl apply -f "$pfile" "$@"
 
     # Wait for the policy to be active and uniquely reachable
     if [ ! -v nowait ]; then
