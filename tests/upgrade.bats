@@ -41,7 +41,9 @@ function check_apiversion {
 }
 
 @test "[CRD upgrade] Check old policy CRD version is translated to new" {
-    yq '.apiVersion = "policies.kubewarden.io/v1alpha2"' $RESOURCES_DIR/policies/policy-pod-privileged.yaml | apply_policy
+    yq '.apiVersion = "policies.kubewarden.io/v1alpha2"' $RESOURCES_DIR/policies/policy-pod-privileged.yaml \
+        | apply_policy --warnings-as-errors=false 2>&1 | grep "Warning: This version is deprecated."
+
     check_apiversion admissionPolicy v1
     delete_policy policy-pod-privileged.yaml
 }
