@@ -19,7 +19,7 @@ setup() {
 teardown_file() {
     load ../helpers/helpers.sh
     kubectl delete admissionpolicies,clusteradmissionpolicies --all -A
-    helmer set kubewarden-defaults --set policyServer.verificationConfig="" # TODO =null - https://github.com/kubewarden/kubewarden-controller/issues/903
+    helmer reset kubewarden-defaults
     kubectl delete configmap -n $NAMESPACE $CONFIGMAP_NAME --ignore-not-found
 }
 
