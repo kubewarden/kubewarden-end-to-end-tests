@@ -62,60 +62,23 @@ export -f get_metrics # required by retry command
     kubectl apply -f $RESOURCES_DIR/opentelemetry-jaeger.yaml
     wait_pods -n jaeger
 
+    kubectl apply --namespace $NAMESPACE -f $RESOURCES_DIR/otel-collector-deployment.yaml
+    wait_pods -n $NAMESPACE
+
     # Setup Kubewarden
-    helmer set kubewarden-controller --values $RESOURCES_DIR/opentelemetry-telemetry.yaml
+    helmer set kubewarden-controller --values $RESOURCES_DIR/opentelemetry-telemetry-remote.yaml
     helmer set kubewarden-defaults --set recommendedPolicies.enabled=True
 }
 
-@test "[OpenTelemetry] Kubewarden containers have sidecars & metrics" {
+@test "[OpenTelemetry] Kubewarden containers send metrics to remote Otel collector" {
     # Controller is restarted to get sidecar
     wait_pods -n $NAMESPACE
-
-    # Check all pods have sidecar (otc-container) - might take a minute to start
-    retry "kubectl get pods -n kubewarden --field-selector=status.phase==Running -o json | jq -e '[.items[].spec.containers[1].name == \"otc-container\"] | all'"
-    # Policy server service has the metrics ports
-    kubectl get services -n $NAMESPACE  policy-server-default -o json | jq -e '[.spec.ports[].name == "metrics"] | any'
-    # Controller service has the metrics ports
-    kubectl get services -n $NAMESPACE kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name == "metrics"] | any'
 
     # Generate metric data
     kubectl run pod-privileged --image=registry.k8s.io/pause --privileged
     kubectl wait --for=condition=Ready pod pod-privileged
     kubectl delete --wait pod pod-privileged
 
-    # Policy server & controller metrics should be available
-    retry 'test $(get_metrics policy-server-default | wc -l) -gt 10'
-    retry 'test $(get_metrics kubewarden-controller-metrics-service | wc -l) -gt 1'
-}
-
-@test "[OpenTelemetry] Audit scanner runs should generate metrics" {
-    kubectl get cronjob -n $NAMESPACE audit-scanner
-
-    # Launch unprivileged & privileged pods
-    kubectl run nginx-unprivileged --image=nginx:alpine
-    kubectl wait --for=condition=Ready pod nginx-unprivileged
-    kubectl run nginx-privileged --image=registry.k8s.io/pause --privileged
-    kubectl wait --for=condition=Ready pod nginx-privileged
-
-    # Deploy some policy
-    apply_policy --no-wait privileged-pod-policy.yaml
-    apply_policy namespace-label-propagator-policy.yaml
-
-    trigger_audit_scan
-    retry 'test $(get_metrics policy-server-default | grep protect | grep -oE "policy_name=\"[^\"]+" | sort -u | wc -l) -eq 2'
-}
-
-@test "[OpenTelemetry] Disabling telemetry should remove sidecars & metrics" {
-    helmer set kubewarden-controller \
-        --set telemetry.metrics=False \
-        --set telemetry.tracing=False
-    helmer set kubewarden-defaults --set recommendedPolicies.enabled=False
-    wait_pods -n $NAMESPACE
-
-    # Check sidecars (otc-container) - have been removed
-    retry "kubectl get pods -n kubewarden -o json | jq -e '[.items[].spec.containers[1].name != \"otc-container\"] | all'"
-    # Policy server service has no metrics ports
-    kubectl get services -n $NAMESPACE policy-server-default -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
-    # Controller service has no metrics ports
-    kubectl get services -n $NAMESPACE kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
+    retry 'test $(get_metrics my-collector-collector | grep "kubewarden_policy_total" | wc -l) -gt 1'
+    retry 'test $(get_metrics my-collector-collector | grep "kubewarden_policy_evaluations_total" | wc -l) -gt 1'
 }

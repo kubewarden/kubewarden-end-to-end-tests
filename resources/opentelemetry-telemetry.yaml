@@ -1,10 +1,11 @@
 telemetry:
-  metrics:
-    enabled: True
-    port: 8080
-  tracing:
-    enabled: True
-    jaeger:
-      endpoint: "my-open-telemetry-collector.jaeger.svc.cluster.local:4317"
-      tls:
-        insecure: true
+  mode: sidecar
+  metrics: true
+  sidecar:
+    metrics:
+      port: 8080
+    tracing:
+      jaeger:
+        endpoint: "my-open-telemetry-collector.jaeger.svc.cluster.local:4317"
+        tls:
+          insecure: true
