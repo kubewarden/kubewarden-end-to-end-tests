@@ -14,6 +14,9 @@ teardown_file() {
     kubectl delete admissionpolicies,clusteradmissionpolicies --all -A
     kubectl delete pod nginx-privileged nginx-unprivileged --ignore-not-found
 
+    kubectl delete --wait --ignore-not-found -f $RESOURCES_DIR/opentelemetry-jaeger.yaml
+    kubectl delete --wait --ignore-not-found --namespace $NAMESPACE -f $RESOURCES_DIR/otel-collector-deployment.yaml
+
     # Remove installed apps
     helm uninstall --wait -n jaeger jaeger-operator
     helm uninstall --wait -n prometheus prometheus
