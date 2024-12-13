@@ -34,7 +34,7 @@ function get_metrics {
 }
 export -f get_metrics # required by retry command
 
-@test "[OpenTelemetry] Install OpenTelemetry, Prometheus, Jaeger" {
+@test "[Remote OpenTelemetry collector] Install OpenTelemetry, Prometheus, Jaeger" {
     # Required by OpenTelemetry
     helm repo add jetstack https://charts.jetstack.io --force-update
     helm upgrade -i --wait cert-manager jetstack/cert-manager \
@@ -70,7 +70,7 @@ export -f get_metrics # required by retry command
     helmer set kubewarden-defaults --set recommendedPolicies.enabled=True
 }
 
-@test "[OpenTelemetry] Kubewarden containers send metrics to remote Otel collector" {
+@test "[Remote OpenTelemetry collector] Kubewarden containers send metrics to remote Otel collector" {
     # Controller is restarted to get sidecar
     wait_pods -n $NAMESPACE
 
