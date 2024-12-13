@@ -1,0 +1,7 @@
+telemetry:
+  mode: custom
+  metrics: true
+  tracing: true
+  custom:
+    endpoint: "http://my-collector-collector.kubewarden.svc:4317"
+    insecure: true
