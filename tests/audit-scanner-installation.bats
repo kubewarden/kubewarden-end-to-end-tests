@@ -5,7 +5,9 @@ setup() {
     wait_pods -n kube-system
 }
 
-CRD_BASE=https://github.com/kubernetes-sigs/wg-policy-prototypes/raw/master/policy-report/crd/v1alpha2/
+# Hardcode PolicyReports to v1alpha2 from clusterpolicyreports.wgpolicyk8s.io and not clusterpolicyreports.x-k8s.io
+# We will need to migrate later in time.
+CRD_BASE=https://github.com/kubernetes-sigs/wg-policy-prototypes/tree/af8c5984c89aa95d8a6719d3994e71ecc31ce6c3/policy-report/crd/v1alpha2/
 
 function kubewarden_uninstall {
     helmer uninstall defaults --ignore-not-found
