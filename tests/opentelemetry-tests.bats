@@ -13,6 +13,9 @@ teardown_file() {
     load ../helpers/helpers.sh
     kubectl delete admissionpolicies,clusteradmissionpolicies --all -A
     kubectl delete pod nginx-privileged nginx-unprivileged --ignore-not-found
+    # Remote otel collector cleanup
+    kubectl delete --ignore-not-found -f $RESOURCES_DIR/opentelemetry-jaeger.yaml
+    kubectl delete --ignore-not-found --namespace $NAMESPACE -f $RESOURCES_DIR/otel-collector-deployment.yaml
 
     # Remove installed apps
     helm uninstall --wait -n jaeger jaeger-operator
@@ -103,6 +106,9 @@ export -f get_metrics # required by retry command
 
     trigger_audit_scan
     retry 'test $(get_metrics policy-server-default | grep protect | grep -oE "policy_name=\"[^\"]+" | sort -u | wc -l) -eq 2'
+
+    delete_policy privileged-pod-policy.yaml
+    delete_policy namespace-label-propagator-policy.yaml
 }
 
 @test "[OpenTelemetry] Disabling telemetry should remove sidecars & metrics" {
@@ -118,4 +124,23 @@ export -f get_metrics # required by retry command
     kubectl get services -n $NAMESPACE policy-server-default -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
     # Controller service has no metrics ports
     kubectl get services -n $NAMESPACE kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
+}
+
+@test "[OpenTelemetry Remote collector] Setup remote Otel collector" {
+    kubectl apply --namespace $NAMESPACE -f $RESOURCES_DIR/otel-collector-deployment.yaml
+    wait_pods -n $NAMESPACE
+
+    helmer set kubewarden-controller --values $RESOURCES_DIR/opentelemetry-telemetry-remote.yaml
+    helmer set kubewarden-defaults --set recommendedPolicies.enabled=True
+    wait_pods -n $NAMESPACE
+}
+
+@test "[OpenTelemetry Remote collector] Metrics are sent to remote Otel collector" {
+    # Generate metric data
+    kubectl run pod-privileged --image=registry.k8s.io/pause --privileged
+    kubectl wait --for=condition=Ready pod pod-privileged
+    kubectl delete --wait pod pod-privileged
+
+    retry 'test $(get_metrics my-collector-collector | grep "kubewarden_policy_total" | wc -l) -gt 1'
+    retry 'test $(get_metrics my-collector-collector | grep "kubewarden_policy_evaluations_total" | wc -l) -gt 1'
 }
