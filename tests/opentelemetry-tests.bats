@@ -13,6 +13,7 @@ teardown_file() {
     load ../helpers/helpers.sh
     kubectl delete admissionpolicies,clusteradmissionpolicies --all -A
     kubectl delete pod nginx-privileged nginx-unprivileged --ignore-not-found
+
     # Remote otel collector cleanup
     kubectl delete --ignore-not-found -f $RESOURCES_DIR/opentelemetry-jaeger.yaml
     kubectl delete --ignore-not-found --namespace $NAMESPACE -f $RESOURCES_DIR/otel-collector-deployment.yaml
@@ -24,6 +25,7 @@ teardown_file() {
     helm uninstall --wait -n cert-manager cert-manager
 
     helmer reset controller
+    helmer reset kubewarden-defaults
 }
 
 # get_metrics policy-server-default
