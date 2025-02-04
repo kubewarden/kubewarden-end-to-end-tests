@@ -41,6 +41,7 @@ function get_policy_server_status {
 # Configure kubewarden to check policy signatures
 # https://docs.kubewarden.io/distributing-policies/secure-supply-chain#configuring-the-policy-server-to-check-policy-signatures
 @test "[Secure Supply Chain tests] Enable" {
+    skip "https://github.com/kubewarden/policy-server/issues/1066"
     # policyserver needs configmap to start in verification mode
     create_configmap <(kwctl scaffold verification-config)
     helmer set kubewarden-defaults --set policyServer.verificationConfig=$CONFIGMAP_NAME
@@ -48,6 +49,7 @@ function get_policy_server_status {
 }
 
 @test "[Secure Supply Chain tests] Trusted policy should not block policy server" {
+    skip "https://github.com/kubewarden/policy-server/issues/1066"
     create_configmap $RESOURCES_DIR/secure-supply-chain-cm.yaml
 
     # Policy Server should start fine
@@ -62,6 +64,7 @@ function get_policy_server_status {
 }
 
 @test "[Secure Supply Chain tests] Untrusted policy should block policy server to run" {
+    skip "https://github.com/kubewarden/policy-server/issues/1066"
     create_configmap $RESOURCES_DIR/secure-supply-chain-cm-restricted.yaml
 
     # Policy Server startup should fail
