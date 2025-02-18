@@ -23,6 +23,7 @@ if [ "${1:-}" == 'create' ]; then
         --image rancher/k3s:$K3S \
         -s $MASTER_COUNT -a $WORKER_COUNT \
         --registry-create k3d-$CLUSTER_NAME-registry \
+        --registry-config <(echo "${K3D_REGISTRY_CONFIG:-}") \
         -v /dev/mapper:/dev/mapper
     wait_pods -n kube-system
 fi
