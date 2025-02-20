@@ -53,7 +53,8 @@ teardown_file() {
 }
 
 @test "[Basic end-to-end tests] Launch & scale second policy server" {
-    kubectl apply -f $RESOURCES_DIR/policy-server.yaml
+    export defaultsImg="ghcr.io/$(helm get values -a kubewarden-defaults -n kubewarden -o json | jq -er '.policyServer.image | .repository + ":"+ .tag')"
+    yq '.spec.image = env(defaultsImg)' $RESOURCES_DIR/policy-server.yaml | kubectl apply -f -
     wait_for policyserver e2e-tests --for=condition=ServiceReconciled
 
     kubectl patch policyserver e2e-tests --type=merge -p '{"spec": {"replicas": 2}}'
