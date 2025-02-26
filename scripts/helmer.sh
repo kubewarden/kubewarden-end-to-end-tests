@@ -141,6 +141,13 @@ do_upgrade() {
         helm get values kubewarden-$chart -n $NAMESPACE -o yaml > /tmp/chart-values.yaml
         helm upgrade kubewarden-$chart -n $NAMESPACE $CHARTS_LOCATION/kubewarden-$chart --wait \
             --version "${vMap[$chart]}" --values /tmp/chart-values.yaml ${!argsvar} "${@:2}"
+
+        if [ "$chart" = 'controller' ]; then
+            [[ "${vMap[$chart]}" == 4.1* ]] && continue # Url renamed to Module in PS ConfigMap
+            [[ "${vMap[$chart]}" == 4.2* ]] && continue # Probe port change from https to http
+            sleep 20 # Wait for reconciliation
+            wait_rollout -n $NAMESPACE deployment/policy-server-default
+        fi
     done
     [ "${1:-defaults}" == 'defaults' ] && wait_rollout -n $NAMESPACE deployment/policy-server-default
 
