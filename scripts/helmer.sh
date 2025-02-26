@@ -144,7 +144,7 @@ do_upgrade() {
 
         if [ "$chart" = 'controller' ]; then
             [[ "${vMap[$chart]}" == 4.1* ]] && continue # Url renamed to Module in PS ConfigMap
-            [[ "${vMap[$chart]}" == 4.2* ]] && continue # Probe port change from https to http
+            [[ "${vMap[$chart]}" == 5.0* ]] && continue # Probe port change from https to http
             sleep 20 # Wait for reconciliation
             wait_rollout -n $NAMESPACE deployment/policy-server-default
         fi
