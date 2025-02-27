@@ -11,6 +11,7 @@ CLUSTER_CONTEXT ?= $(shell kubectl config current-context)
 # Optional arguments for scripts
 
 # cluster_k3d.sh:
+#   MTLS=1
 #   K3S=[1.30] - short|long version
 #   CLUSTER_NAME=[k3d-default]
 
