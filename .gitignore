@@ -1,2 +1,4 @@
 resources/resources_*/
+resources/mtls/domain.*
+resources/mtls/rootCA.*
 charts

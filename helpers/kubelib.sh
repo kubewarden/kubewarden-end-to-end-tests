@@ -101,3 +101,25 @@ is_version() {
 
 # Query against installed kubewarden app version
 kw_version() { is_version "$1" "$(helm ls -n $NAMESPACE -f kubewarden-crds -o json | jq -r '.[0].app_version')"; }
+
+# ==================================================================================================
+# Others
+
+# https://www.baeldung.com/openssl-self-signed-cert
+function generate_certs {
+    local path=${1:-}
+    local fqdn=${2:-cert.kubewarden.io}
+
+    mkdir -p $path && cd $path
+    # Create CA
+    openssl req -quiet -nodes -batch -x509 -sha256 -days 365 -newkey rsa:2048 -keyout rootCA.key -out rootCA.crt
+    # Create CSR
+    openssl req -quiet -nodes -batch -newkey rsa:2048 -keyout domain.key -out domain.csr \
+        -addext "subjectAltName = DNS:$fqdn"
+    # Create CRT
+    openssl x509 -req -CA rootCA.crt -CAkey rootCA.key -in domain.csr -out domain.crt -days 365 -CAcreateserial \
+        -extfile <(echo "subjectAltName=DNS:$fqdn")
+    # Print CRT
+    # openssl x509 -text -noout -in domain.crt
+    cd -
+}

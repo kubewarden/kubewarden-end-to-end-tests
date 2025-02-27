@@ -28,28 +28,10 @@ teardown_file() {
     kubectl delete secret registry-cert --ignore-not-found
 }
 
-# https://www.baeldung.com/openssl-self-signed-cert
-@test "[Private Registry] Generate certificates" {
-    certdir="$BATS_RUN_TMPDIR/certs/"
-    mkdir $certdir && cd $certdir
-
-    # Create CA
-    openssl req -nodes -batch -x509 -sha256 -days 365 -newkey rsa:2048 -keyout rootCA.key -out rootCA.crt
-    # Create CSR
-    openssl req -nodes -batch -newkey rsa:2048 -keyout domain.key -out domain.csr \
-        -addext "subjectAltName = DNS:$FQDN"
-    # Create CRT
-    openssl x509 -req -CA rootCA.crt -CAkey rootCA.key -in domain.csr -out domain.crt -days 365 -CAcreateserial \
-        -extfile <(echo "subjectAltName=DNS:$FQDN")
-    # Print CRT
-    openssl x509 -text -noout -in domain.crt
-
-    cd -
-}
-
 # https://medium.com/geekculture/deploying-docker-registry-on-kubernetes-3319622b8f32
 @test "[Private Registry] Generate AUTH and start registry" {
     certdir="$BATS_RUN_TMPDIR/certs/"
+    generate_certs "$certdir" "$FQDN"
 
     # Create configmap from htpasswd
     # docker run --entrypoint htpasswd httpd:2 -Bbn testuser testpassword

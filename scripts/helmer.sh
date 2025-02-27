@@ -29,6 +29,10 @@ if [ -n "${LATEST:-}" ]; then
     DEFAULTS_ARGS="--set policyServer.image.tag=latest $DEFAULTS_ARGS"
     CONTROLLER_ARGS="--set image.tag=latest --set auditScanner.image.tag=latest $CONTROLLER_ARGS"
 fi
+# Configure mTLS
+if [ -n "${MTLS:-}" ]; then
+    CONTROLLER_ARGS="--set mTLS.enable=true --set mTLS.configMapName=mtlscm $CONTROLLER_ARGS"
+fi
 
 # Prepend "v" and append .0 to partial versions
 [[ $VERSION =~ ^[1-9] ]] && VERSION="v$VERSION"
@@ -114,6 +118,11 @@ do_install() {
     if is_version "<1.17" "${vMap[app]}"; then
         helm repo add jetstack https://charts.jetstack.io --force-update
         helm upgrade -i --wait cert-manager jetstack/cert-manager -n cert-manager --create-namespace --set crds.enabled=true
+    fi
+
+    if [ -n "${MTLS:-}" ]; then
+        kubectl create ns $NAMESPACE
+        kubectl create configmap -n $NAMESPACE mtlscm --from-file=client-ca.crt=$(dirname "$0")/../resources/mtls/rootCA.crt
     fi
 
     local argsvar
