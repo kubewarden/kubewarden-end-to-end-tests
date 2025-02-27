@@ -9,6 +9,7 @@ K3S=${K3S:-$(k3d version -o json | jq -r '.k3s')}
 CLUSTER_NAME=${CLUSTER_NAME:-k3s-default}
 MASTER_COUNT=${MASTER_COUNT:-1}
 WORKER_COUNT=${WORKER_COUNT:-1}
+MTLS=${MTLS:-}
 
 # Complete partial K3S version from dockerhub
 if [[ ! $K3S =~ ^v[0-9.]+-k3s[0-9]$ ]]; then
@@ -18,13 +19,23 @@ fi
 
 # Create new cluster
 if [ "${1:-}" == 'create' ]; then
+    # Generate certificates
+    if [ -n "${MTLS:-}" ]; then
+        MTLS_DIR=$(dirname $(realpath -s $0))/../resources/mtls/
+        generate_certs "$MTLS_DIR" mtls.kubewarden.io
+    fi
+
     # /dev/mapper: https://k3d.io/v5.7.4/faq/faq/#issues-with-btrfs
+    # registry-config: https://k3d.io/v5.8.3/faq/faq/#dockerhub-pull-rate-limit
     k3d cluster create $CLUSTER_NAME --wait \
         --image rancher/k3s:$K3S \
         -s $MASTER_COUNT -a $WORKER_COUNT \
         --registry-create k3d-$CLUSTER_NAME-registry \
         --registry-config <(echo "${K3D_REGISTRY_CONFIG:-}") \
-        -v /dev/mapper:/dev/mapper
+        -v /dev/mapper:/dev/mapper \
+        ${MTLS:+--k3s-arg '--kube-apiserver-arg=admission-control-config-file=/etc/mtls/admission.yaml@server:*'} \
+        ${MTLS:+--volume "$MTLS_DIR:/etc/mtls@server:*"}
+
     wait_pods -n kube-system
 fi
 

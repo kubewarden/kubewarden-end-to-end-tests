@@ -29,6 +29,10 @@ if [ -n "${LATEST:-}" ]; then
     DEFAULTS_ARGS="--set policyServer.image.tag=latest $DEFAULTS_ARGS"
     CONTROLLER_ARGS="--set image.tag=latest --set auditScanner.image.tag=latest $CONTROLLER_ARGS"
 fi
+# Use mTLS parameters
+if [ -n "${MTLS:-}" ]; then
+    CONTROLLER_ARGS="--set mTLS.enable=true --set mTLS.configMapName=mtlscm $CONTROLLER_ARGS"
+fi
 
 # Prepend "v" and append .0 to partial versions
 [[ $VERSION =~ ^[1-9] ]] && VERSION="v$VERSION"
@@ -64,6 +68,11 @@ print_env() {
 }
 
 load_env() { source /tmp/helmer.env; }
+
+mtls_configmap() {
+    kubectl get ns $NAMESPACE &>/dev/null || kubectl create ns $NAMESPACE
+    kubectl get cm -n $NAMESPACE mtlscm &>/dev/null || kubectl create cm -n $NAMESPACE mtlscm --from-file=client-ca.crt=$(dirname "$0")/../resources/mtls/rootCA.crt
+}
 
 # Parse app $VERSION into chart versions (vMap)
 declare -A vMap
@@ -139,8 +148,7 @@ do_upgrade() {
         argsvar=${chart^^}_ARGS
         # Look into --reset-then-reuse-values helm flag as replacement
         helm get values kubewarden-$chart -n $NAMESPACE -o yaml > /tmp/chart-values.yaml
-        helm upgrade kubewarden-$chart -n $NAMESPACE $CHARTS_LOCATION/kubewarden-$chart --wait \
-            --version "${vMap[$chart]}" --values /tmp/chart-values.yaml ${!argsvar} "${@:2}"
+        helm upgrade kubewarden-$chart -n $NAMESPACE $CHARTS_LOCATION/kubewarden-$chart --wait --version "${vMap[$chart]}" --values /tmp/chart-values.yaml ${!argsvar} "${@:2}"
 
         if [ "$chart" = 'controller' ]; then
             [[ "${vMap[$chart]}" == 4.1* ]] && continue # Url renamed to Module in PS ConfigMap
@@ -171,7 +179,8 @@ do_set() {
     helm upgrade kubewarden-$chart $CHARTS_LOCATION/kubewarden-$chart -n $NAMESPACE --wait --wait-for-jobs \
          --version "$ver" --reuse-values "${@:2}"
 
-    [ "$1" = 'defaults' ] && wait_rollout -n $NAMESPACE deployment/policy-server-default
+    [[ "$1" == 'controller' ]] && sleep 20 # Wait for reconciliation
+    [[ "$1" =~ (controller|defaults) ]] && wait_rollout -n $NAMESPACE deployment/policy-server-default
     return 0
 }
 
@@ -190,6 +199,7 @@ do_reset() {
 
 case $1 in
     in|install|up|upgrade)
+        [ -n "${MTLS:-}" ] && mtls_configmap
         make_version_map;;&
     reinstall|uninstall|set|reset)
         load_env;;&
