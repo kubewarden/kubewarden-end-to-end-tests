@@ -50,7 +50,7 @@ export -f get_metrics # required by retry command
     helm repo add --force-update open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
     helm upgrade -i --wait my-opentelemetry-operator open-telemetry/opentelemetry-operator \
         --set "manager.collectorImage.repository=otel/opentelemetry-collector-contrib" \
-        -n open-telemetry --create-namespace
+        -n open-telemetry --create-namespace --version 0.80.2 # Lock version because of https://github.com/kubewarden/kubewarden-controller/issues/1026
 
     # Prometheus
     helm repo add --force-update prometheus-community https://prometheus-community.github.io/helm-charts
