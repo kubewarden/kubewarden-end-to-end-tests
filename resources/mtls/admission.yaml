@@ -1,4 +1,3 @@
-# /etc/rancher/admission/admission.yaml
 apiVersion: apiserver.config.k8s.io/v1
 kind: AdmissionConfiguration
 plugins:
