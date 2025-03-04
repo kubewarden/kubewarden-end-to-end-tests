@@ -9,7 +9,7 @@ K3S=${K3S:-$(k3d version -o json | jq -r '.k3s')}
 CLUSTER_NAME=${CLUSTER_NAME:-k3s-default}
 MASTER_COUNT=${MASTER_COUNT:-1}
 WORKER_COUNT=${WORKER_COUNT:-1}
-MTLS=${MTLS:-} # ${MTLS:-$(dirname $(realpath -s $0))/../resources/mtls}
+MTLS=${MTLS:-}
 
 # Complete partial K3S version from dockerhub
 if [[ ! $K3S =~ ^v[0-9.]+-k3s[0-9]$ ]]; then
