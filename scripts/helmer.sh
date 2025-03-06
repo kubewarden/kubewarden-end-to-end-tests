@@ -29,6 +29,10 @@ if [ -n "${LATEST:-}" ]; then
     DEFAULTS_ARGS="--set policyServer.image.tag=latest $DEFAULTS_ARGS"
     CONTROLLER_ARGS="--set image.tag=latest --set auditScanner.image.tag=latest $CONTROLLER_ARGS"
 fi
+# Use mTLS parameters
+if [ -n "${MTLS:-}" ]; then
+    CONTROLLER_ARGS="--set mTLS.enable=true --set mTLS.configMapName=mtlscm $CONTROLLER_ARGS"
+fi
 
 # Prepend "v" and append .0 to partial versions
 [[ $VERSION =~ ^[1-9] ]] && VERSION="v$VERSION"
@@ -64,6 +68,11 @@ print_env() {
 }
 
 load_env() { source /tmp/helmer.env; }
+
+mtls_configmap() {
+    kubectl get ns $NAMESPACE &>/dev/null || kubectl create ns $NAMESPACE
+    kubectl get cm -n $NAMESPACE mtlscm &>/dev/null || kubectl create cm -n $NAMESPACE mtlscm --from-file=client-ca.crt=$(dirname "$0")/../resources/mtls/rootCA.crt
+}
 
 # Parse app $VERSION into chart versions (vMap)
 declare -A vMap
@@ -104,8 +113,11 @@ make_version_map() {
 # ==================================================================================================
 # Install & Upgrade kubewarden (change chart version)
 
-# Usage: helm_in kubewarden-crds [--params ..]
-helm_in() { helm install --wait --wait-for-jobs --namespace $NAMESPACE "${@:2}" "$1" "$CHARTS_LOCATION/$1"; }
+# Usage: helm_up kubewarden-crds [--params ..]
+helm_up() {
+    echo helm_up ... -n $NAMESPACE "${@:2}" "$1" "$CHARTS_LOCATION/$1"
+    helm upgrade -i --create-namespace --wait --wait-for-jobs -n $NAMESPACE "${@:2}" "$1" "$CHARTS_LOCATION/$1"
+}
 
 # Install selected $VERSION
 do_install() {
@@ -119,7 +131,7 @@ do_install() {
     local argsvar
     for chart in ${1:-crds controller defaults}; do
         argsvar=${chart^^}_ARGS
-        helm_in kubewarden-$chart --create-namespace --version "${vMap[$chart]}" ${!argsvar} "${@:2}"
+        helm_up kubewarden-$chart --version "${vMap[$chart]}" ${!argsvar} "${@:2}"
     done
 
     if [ "${1:-defaults}" = 'defaults' ]; then
@@ -139,8 +151,7 @@ do_upgrade() {
         argsvar=${chart^^}_ARGS
         # Look into --reset-then-reuse-values helm flag as replacement
         helm get values kubewarden-$chart -n $NAMESPACE -o yaml > /tmp/chart-values.yaml
-        helm upgrade kubewarden-$chart -n $NAMESPACE $CHARTS_LOCATION/kubewarden-$chart --wait \
-            --version "${vMap[$chart]}" --values /tmp/chart-values.yaml ${!argsvar} "${@:2}"
+        helm_up kubewarden-$chart --version "${vMap[$chart]}" --values /tmp/chart-values.yaml ${!argsvar} "${@:2}"
 
         if [ "$chart" = 'controller' ]; then
             [[ "${vMap[$chart]}" == 4.1* ]] && continue # Url renamed to Module in PS ConfigMap
@@ -168,10 +179,10 @@ do_set() {
     local chart="$1"
 
     local ver=$(helm get metadata kubewarden-$chart -n $NAMESPACE -o json | jq -er '.version')
-    helm upgrade kubewarden-$chart $CHARTS_LOCATION/kubewarden-$chart -n $NAMESPACE --wait --wait-for-jobs \
-         --version "$ver" --reuse-values "${@:2}"
+    helm_up kubewarden-$chart --version "$ver" --reuse-values "${@:2}"
 
-    [ "$1" = 'defaults' ] && wait_rollout -n $NAMESPACE deployment/policy-server-default
+    [[ "$1" == 'controller' ]] && sleep 20 # Wait for reconciliation
+    [[ "$1" =~ (controller|defaults) ]] && wait_rollout -n $NAMESPACE deployment/policy-server-default
     return 0
 }
 
@@ -180,8 +191,7 @@ do_reset() {
     local argsvar=${chart^^}_ARGS
 
     local ver=$(helm get metadata kubewarden-$chart -n $NAMESPACE -o json | jq -er '.version')
-    helm upgrade kubewarden-$chart $CHARTS_LOCATION/kubewarden-$chart -n $NAMESPACE --wait --wait-for-jobs \
-         --version "$ver" --reset-values ${!argsvar} "${@:2}"
+    helm_up kubewarden-$chart --version "$ver" --reset-values ${!argsvar} "${@:2}"
 
     # Wait for pods to be ready
     [ "$1" = 'defaults' ] && wait_rollout -n $NAMESPACE deployment/policy-server-default
@@ -190,6 +200,7 @@ do_reset() {
 
 case $1 in
     in|install|up|upgrade)
+        [ -n "${MTLS:-}" ] && mtls_configmap
         make_version_map;;&
     reinstall|uninstall|set|reset)
         load_env;;&
