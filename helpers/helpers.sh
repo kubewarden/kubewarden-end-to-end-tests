@@ -83,8 +83,8 @@ function wait_policies {
     # Policy groups were added in Kubewarden >= v1.17.0
     kw_version ">=1.17" && resources+=",admissionpolicygroups,clusteradmissionpolicygroups"
 
-    for chart in ${1:-PolicyActive PolicyUniquelyReachable}; do
-        wait_for --for=condition="$1" "$resources" --all -A
+    for state in ${1:-PolicyActive PolicyUniquelyReachable}; do
+        wait_for --for=condition="$state" "$resources" --all -A
     done
 }
 
