@@ -40,6 +40,13 @@ function kubefail_privileged {
     assert_output --regexp '^Error.*: admission webhook.*denied the request.*container is not allowed$'
 }
 
+# Run kubectl action which should fail on pod using privileged escalation or shared pid namespace without the mandatory annotation
+function kubefail_policy_group {
+    run kubectl "$@"
+    assert_failure 1
+    assert_output --regexp '^Error.*: admission webhook.*denied the request: the pod is using privileged escalation or shared pid namespace and has not the mandatory annotation$'
+}
+
 # Prepend policies with RESOURCE dir if file doesn't contain '/'
 policypath() { [[ "$1" == */* ]] && echo "$1" || echo "$RESOURCES_DIR/policies/$1"; }
 
