@@ -1,0 +1,26 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicyGroup
+metadata:
+  name: policy-group
+spec:
+  rules:
+    - apiGroups: [""]
+      apiVersions: ["v1"]
+      resources: ["pods"]
+      operations:
+        - CREATE
+        - UPDATE
+  policies:
+    mandatory_pod_annotations:
+      module: ghcr.io/kubewarden/policies/safe-annotations
+      settings:
+        mandatory_annotations:
+          - super_pod
+    denied_shared_process_namespace:
+      module: ghcr.io/kubewarden/policies/share-pid-namespace-policy
+    denied_privilege_escalation:
+      module: ghcr.io/kubewarden/policies/allow-privilege-escalation-psp
+      settings:
+        default_allow_privilege_escalation: false
+  expression: "mandatory_pod_annotations() || (denied_privilege_escalation() && denied_shared_process_namespace())"
+  message: "the pod is using privileged escalation or shared pid namespace and has not the mandatory annotation"
