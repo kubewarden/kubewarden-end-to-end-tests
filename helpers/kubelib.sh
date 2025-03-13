@@ -60,7 +60,7 @@ function wait_nodes() {
 
 function wait_for    () { kubectl wait --timeout=5m "$@"; }
 # Wait for terminating pods after rollout
-function wait_rollout() { kubectl rollout status --timeout=5m "$@"; wait_pods -n kubewarden; }
+function wait_rollout() { kubectl rollout status --timeout=5m "$@"; wait_pods; }
 
 # Wait for cluster to come up after reboot
 function wait_cluster() {
@@ -113,9 +113,9 @@ function generate_certs {
 
     mkdir -p $path && cd $path
     # Create CA
-    openssl req -quiet -nodes -batch -x509 -sha256 -days 365 -newkey rsa:2048 -keyout rootCA.key -out rootCA.crt
+    openssl req -nodes -batch -x509 -sha256 -days 365 -newkey rsa:2048 -keyout rootCA.key -out rootCA.crt
     # Create CSR
-    openssl req -quiet -nodes -batch -newkey rsa:2048 -keyout domain.key -out domain.csr \
+    openssl req -nodes -batch -newkey rsa:2048 -keyout domain.key -out domain.csr \
         -addext "subjectAltName = DNS:$fqdn"
     # Create CRT
     openssl x509 -req -CA rootCA.crt -CAkey rootCA.key -in domain.csr -out domain.crt -days 365 -CAcreateserial \
