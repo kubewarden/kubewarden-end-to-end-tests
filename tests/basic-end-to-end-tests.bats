@@ -53,14 +53,13 @@ teardown_file() {
 }
 
 @test "[Basic end-to-end tests] Launch & scale second policy server" {
-    export defaultsImg="ghcr.io/$(helm get values -a kubewarden-defaults -n kubewarden -o json | jq -er '.policyServer.image | .repository + ":"+ .tag')"
-    yq '.spec.image = env(defaultsImg)' $RESOURCES_DIR/policy-server.yaml | kubectl apply -f -
+    create_policyserver e2e-tests
     wait_for policyserver e2e-tests --for=condition=ServiceReconciled
 
     kubectl patch policyserver e2e-tests --type=merge -p '{"spec": {"replicas": 2}}'
     wait_policyserver e2e-tests
 
-    kubectl delete -f $RESOURCES_DIR/policy-server.yaml
+    kubectl delete ps e2e-tests
 }
 
 @test "[Basic end-to-end tests] Apply policy group to block privileged escalation and shared pid namespace pods" {
@@ -85,6 +84,6 @@ teardown_file() {
     # I can create pod using privileged escalation and shared pid namespace with the mandatory annotation
     kubectl run nginx-privi-escalation-shared-pid --image=nginx:alpine --annotations="super_pod=true" \
         --overrides='{"spec":{"shareProcessNamespace":true,"containers":[{"name":"nginx-privi-escalation-shared-pid","image":"nginx:alpine","securityContext":{"allowPrivilegeEscalation":true}}]}}'
-    
+
     delete_policy policy-group-escalation-shared-pid.yaml
 }

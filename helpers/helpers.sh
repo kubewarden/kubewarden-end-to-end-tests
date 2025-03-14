@@ -95,6 +95,25 @@ function wait_policies {
     done
 }
 
+# When we test new features we might requite latest/stable policy-server
+# This deploys same image as defaults, utilizing LATEST=1 hack if needed
+# create_policyserver [name]
+function create_policyserver {
+    local name="${1:-pserver}"
+    local image="ghcr.io/$(helm get values -a kubewarden-defaults -n kubewarden -o json | jq -er '.policyServer.image | .repository + ":"+ .tag')"
+    kubectl apply -f - <<EOF
+apiVersion: policies.kubewarden.io/v1
+kind: PolicyServer
+metadata:
+  name: $name
+spec:
+  image: $image
+  replicas: 1
+EOF
+
+    wait_policyserver $name
+}
+
 # wait_policyserver [name]
 function wait_policyserver {
     local name="${1:-default}"
