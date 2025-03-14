@@ -69,11 +69,6 @@ print_env() {
 
 load_env() { source /tmp/helmer.env; }
 
-mtls_configmap() {
-    kubectl get ns $NAMESPACE &>/dev/null || kubectl create ns $NAMESPACE
-    kubectl get cm -n $NAMESPACE mtlscm &>/dev/null || kubectl create cm -n $NAMESPACE mtlscm --from-file=client-ca.crt=$(dirname "$0")/../resources/mtls/rootCA.crt
-}
-
 # Parse app $VERSION into chart versions (vMap)
 declare -A vMap
 make_version_map() {
@@ -116,17 +111,29 @@ make_version_map() {
 # Usage: helm_up kubewarden-crds [--params ..]
 helm_up() {
     echo helm_up ... -n $NAMESPACE "${@:2}" "$1" "$CHARTS_LOCATION/$1"
-    helm upgrade -i --create-namespace --wait --wait-for-jobs -n $NAMESPACE "${@:2}" "$1" "$CHARTS_LOCATION/$1"
+    helm upgrade -i --wait --wait-for-jobs -n $NAMESPACE "${@:2}" "$1" "$CHARTS_LOCATION/$1"
+}
+
+# Required configuration before install / upgrade
+setup_requirements() {
+    # No namespace = installation
+    if ! kubectl get ns $NAMESPACE &>/dev/null; then
+        kubectl create ns $NAMESPACE
+        # Enforce PSA restricted profile - https://github.com/kubewarden/helm-charts/pull/648
+        if is_version ">=1.23" "${vMap[app]}"; then
+            kubectl label ns $NAMESPACE kubewarden.io/psa-restricted=restricted
+        fi
+    fi
+
+    # Helm charts require mTLS configmap
+    if [ -n "${MTLS:-}" ]; then
+        kubectl get cm -n $NAMESPACE mtlscm &>/dev/null || kubectl create cm -n $NAMESPACE mtlscm --from-file=client-ca.crt=$(dirname "$0")/../resources/mtls/rootCA.crt
+    fi
 }
 
 # Install selected $VERSION
 do_install() {
     echo "Install $VERSION: ${vMap[*]}"
-    # Cert-manager is required by Kubewarden <= v1.16.0
-    if is_version "<1.17" "${vMap[app]}"; then
-        helm repo add jetstack https://charts.jetstack.io --force-update
-        helm upgrade -i --wait cert-manager jetstack/cert-manager -n cert-manager --create-namespace --set crds.enabled=true
-    fi
 
     local argsvar
     for chart in ${1:-crds controller defaults}; do
@@ -139,6 +146,7 @@ do_install() {
         retry "kubectl get -n $NAMESPACE deployment/policy-server-default" 5
         wait_rollout -n $NAMESPACE deployment/policy-server-default
     fi
+
     return 0
 }
 
@@ -162,8 +170,6 @@ do_upgrade() {
     done
     [ "${1:-defaults}" == 'defaults' ] && wait_rollout -n $NAMESPACE deployment/policy-server-default
 
-    # Cert-manager is not required by Kubewarden >= v1.17.0 (crds >= 1.9.0)
-    kw_version ">=1.17" && helm uninstall --wait cert-manager -n cert-manager --ignore-not-found
     return 0
 }
 
@@ -199,12 +205,16 @@ do_reset() {
 }
 
 case $1 in
+    # Build version map of charts
     in|install|up|upgrade)
-        [ -n "${MTLS:-}" ] && mtls_configmap
         make_version_map;;&
     reinstall|uninstall|set|reset)
         load_env;;&
 
+    # Handle kubewarden requirements
+    in|install|up|upgrade) setup_requirements;;&
+
+    # Call action function
     in|install) do_install "${@:2}";;
     up|upgrade) do_upgrade "${@:2}";;
     reinstall)  do_install "${@:2}";;
