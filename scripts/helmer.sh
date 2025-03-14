@@ -74,6 +74,26 @@ mtls_configmap() {
     kubectl get cm -n $NAMESPACE mtlscm &>/dev/null || kubectl create cm -n $NAMESPACE mtlscm --from-file=client-ca.crt=$(dirname "$0")/../resources/mtls/rootCA.crt
 }
 
+create_kw_namespace_with_psa() {
+    local ns_name="$1"
+    local enforce_version=$(kubectl version | grep "Server Version" | awk '{print $3}' | awk -F'[.+]' '{print $1 "." $2}')
+
+    if [[ -z "$ns_name" ]]; then
+        echo "Usage: create_namespace_with_psa <ns_name>
+        return 1
+    fi
+
+    kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: $ns_name
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: $enforce_version
+EOF
+}
+
 # Parse app $VERSION into chart versions (vMap)
 declare -A vMap
 make_version_map() {
@@ -127,6 +147,8 @@ do_install() {
         helm repo add jetstack https://charts.jetstack.io --force-update
         helm upgrade -i --wait cert-manager jetstack/cert-manager -n cert-manager --create-namespace --set crds.enabled=true
     fi
+
+    kw_version ">=1.23" && create_kw_namespace_with_psa $NAMESPACE
 
     local argsvar
     for chart in ${1:-crds controller defaults}; do
