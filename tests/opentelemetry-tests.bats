@@ -63,6 +63,8 @@ export -f get_metrics # required by retry command
     helm upgrade -i --wait jaeger-operator jaegertracing/jaeger-operator \
         -n jaeger --create-namespace \
         --set rbac.clusterRole=true
+    # Wait for service: Internal error occurred: failed calling webhook "mjaeger.kb.io": failed to call webhook
+    retry "kuberun wget -O- https://jaeger-operator-webhook-service.jaeger.svc/mutate-jaegertracing-io-v1-jaeger" 2 10
 
     kubectl apply -f $RESOURCES_DIR/opentelemetry-jaeger.yaml
     wait_pods -n jaeger

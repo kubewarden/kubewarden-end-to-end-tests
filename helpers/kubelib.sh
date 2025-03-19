@@ -124,3 +124,19 @@ function generate_certs {
     # openssl x509 -text -noout -in domain.crt
     cd -
 }
+
+# Run command and delete pod afterwards. Use busybox by default.
+# When both kubectl args & command are used: -- separator is required.
+# kuberun [kubectl args] -- [command [args]]
+function kuberun {
+    # No kubectl args: add -- separator
+    [ "${1:0:1}" != "-" ] && set -- -- "$@"
+    # No command (-- is missing): use -- true as default
+    [[ " $* " != *" -- "* ]] && set -- "$@" -- true
+    # Set command defaults
+    [[ "$*" =~ "-- wget" ]] && set -- "${@/-- wget/-- wget --quiet --no-check-certificates}"
+    [[ "$*" =~ "-- curl" ]] && set -- "${@/-- curl/-- curl -k --no-progress-meter}"
+
+    kubectl run "pod-$(date +%s)" --image=busybox --restart=Never --rm -it -q --command "$@"
+}
+export -f kuberun
