@@ -25,14 +25,6 @@ trigger_audit_scan() {
     kubectl delete job $jobname --namespace $NAMESPACE
 }
 
-# Run & delete pod with optional parameters. Check exit code.
-# kuberun [-0|-1|-N|!] "--privileged"
-function kuberun {
-    local status=-0
-    [[ $1 =~ ^([!]|-[0-9]+)$ ]] && status="$1" && shift
-    run "$status" kubectl run "pod-$(date +%s)" --image=busybox --restart=Never --rm -it --command "$@" -- true
-}
-
 # Run kubectl action which should fail on pod privileged policy
 function kubefail_privileged {
     run kubectl "$@"

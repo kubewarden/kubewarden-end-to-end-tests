@@ -61,7 +61,7 @@ function check_service_mtls {
 
     # Check protected policy still blocks requests
     apply_policy safe-labels-pods-policy.yaml
-    kuberun ! -l cost-center=lbl
+    run ! kuberun -l cost-center=lbl
 }
 
 @test "[Mutual TLS] Disable mTLS" {
