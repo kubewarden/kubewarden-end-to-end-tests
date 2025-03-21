@@ -63,7 +63,7 @@ check_report_result() {
     wait_for pod nginx-unprivileged
 
     # Launch privileged pod
-    kubectl run nginx-privileged --image=registry.k8s.io/pause --privileged
+    kubectl run nginx-privileged --image=rancher/pause:3.2 --privileged
     wait_for pod nginx-privileged
 
     # Create a namespace to trigger a fail evaluation in the audit scanner

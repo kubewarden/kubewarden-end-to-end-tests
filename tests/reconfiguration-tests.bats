@@ -26,9 +26,9 @@ teardown_file() {
 
 @test "[Reconfiguration tests] Test that pod-privileged policy works" {
     # Launch unprivileged pod
-    kubectl run pause-unprivileged --image registry.k8s.io/pause
+    kubectl run pause-unprivileged --image rancher/pause:3.2
     wait_for pod pause-unprivileged
 
     # Launch privileged pod (should fail)
-    kubefail_privileged run pause-privileged --image registry.k8s.io/pause --privileged
+    kubefail_privileged run pause-privileged --image rancher/pause:3.2 --privileged
 }
