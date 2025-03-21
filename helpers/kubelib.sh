@@ -58,7 +58,8 @@ function wait_nodes() {
     done
 }
 
-function wait_for    () { kubectl wait --timeout=5m "$@"; }
+# Wait for Ready condition by default, could be overridden with --for=condition=...
+function wait_for    () { kubectl wait --timeout=5m --for=condition=Ready "$@"; }
 # Wait for terminating pods after rollout
 function wait_rollout() { kubectl rollout status --timeout=5m "$@"; wait_pods; }
 

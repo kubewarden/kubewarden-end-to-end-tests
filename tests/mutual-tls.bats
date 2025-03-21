@@ -37,7 +37,7 @@ function check_service_mtls {
 
     # Set up pod with certificates for curl
     kubectl run curlpod --image=nginx:alpine
-    kubectl wait --for=condition=Ready pod curlpod
+    wait_for pod curlpod
     kubectl cp resources/mtls curlpod:/mtls
 }
 

@@ -17,7 +17,7 @@ teardown_file() {
 
     # New pod should be mutated by the policy
     kubectl run pause-user-group --image registry.k8s.io/pause
-    kubectl wait --for=condition=Ready pod pause-user-group
+    wait_for pod pause-user-group
     kubectl get pod pause-user-group -o json | jq -e ".spec.containers[].securityContext.runAsUser==1000"
     kubectl delete pod pause-user-group
 

@@ -60,11 +60,11 @@ check_report_result() {
 
     # Launch unprivileged pod
     kubectl run nginx-unprivileged --image=nginx:alpine
-    kubectl wait --for=condition=Ready pod nginx-unprivileged
+    wait_for pod nginx-unprivileged
 
     # Launch privileged pod
     kubectl run nginx-privileged --image=registry.k8s.io/pause --privileged
-    kubectl wait --for=condition=Ready pod nginx-privileged
+    wait_for pod nginx-privileged
 
     # Create a namespace to trigger a fail evaluation in the audit scanner
     kubectl create ns testing-audit-scanner
