@@ -84,6 +84,9 @@ ge() { printf '%s\n' "$1" "$2" | sed '/-/!{s/$/_/}' | sort -V -C -r; }
 gt() { ! le "$1" "$2"; }
 lt() { ! ge "$1" "$2"; }
 
+# SemVer: Append _ to stable versions to sort RC < Release
+semsort() { sed -E '/[0-9]-[a-z]/! s/([0-9])( |$)/\1_\2/g' | sort -b -V "${@:-}" | sed -E 's/([0-9])_( |$)/\1\2/g'; }
+
 # Check if current version satisfies query (semver.satifies)
 # $1: version query (e.g., ">=1.17", "<1.17.0", "=1.17.0-rc2")
 # $2: current version (e.g., "1.17.0-rc1")
