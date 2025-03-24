@@ -10,6 +10,10 @@ info () { log 0  "  ${*}"; }
 warn () { log 33 "  ${*}"; }
 error() { log 31 "  ${*}"; }
 
+# Check github truthy | falsy variables
+gh_true() { ! is_false "$1"; }
+gh_false() { [[ "${!1:-}" =~ ^(false|0|-0|null)$ ]]; }
+
 # ==================================================================================================
 # Kubernetes helpers
 
