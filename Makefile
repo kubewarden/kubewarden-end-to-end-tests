@@ -36,7 +36,7 @@ $(TESTFILES):
 	bats -T --print-output-on-failure $(TESTS_DIR)/$@
 
 # Target all non-destructive tests
-tests: $(filter-out upgrade.bats audit-scanner-installation.bats, $(TESTFILES))
+tests: $(filter-out audit-scanner-installation.bats, $(TESTFILES))
 
 cluster:
 	./scripts/cluster_k3d.sh create
@@ -46,7 +46,6 @@ install: check
 
 upgrade:
 	./scripts/helmer.sh upgrade
-	$(MAKE) upgrade.bats
 
 uninstall:
 	./scripts/helmer.sh uninstall
