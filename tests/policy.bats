@@ -56,3 +56,9 @@ POLICY_NUMBER=6
     kubectl create ns shouldbeignored
     kuberun --privileged -n shouldbeignored
 }
+
+@test "[Recommended policies] Disable policies & run privileged pod" {
+    helmer set kubewarden-defaults --set recommendedPolicies.enabled=False
+    kubectl run pod-privileged --image=rancher/pause:3.2 --privileged
+    kubectl delete pod pod-privileged
+}

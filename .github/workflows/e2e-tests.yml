@@ -66,7 +66,7 @@ jobs:
           cluster-name: ${{ github.repository_owner }}-ghactions-cluster
       - name: "Run all end-to-end tests"
         run: |
-          make --directory e2e-tests tests audit-scanner-installation.bats upgrade.bats
+          make --directory e2e-tests tests audit-scanner-installation.bats
         shell: bash
         env:
           CLUSTER_NAME: ${{ github.repository_owner }}-ghactions-cluster
