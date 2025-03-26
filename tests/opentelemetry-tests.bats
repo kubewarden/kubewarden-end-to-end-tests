@@ -86,8 +86,8 @@ export -f get_metrics # required by retry command
     kubectl get services -n $NAMESPACE kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name == "metrics"] | any'
 
     # Generate metric data
-    kubectl run pod-privileged --image=registry.k8s.io/pause --privileged
-    kubectl wait --for=condition=Ready pod pod-privileged
+    kubectl run pod-privileged --image=rancher/pause:3.2 --privileged
+    wait_for pod pod-privileged
     kubectl delete --wait pod pod-privileged
 
     # Policy server & controller metrics should be available
@@ -100,9 +100,9 @@ export -f get_metrics # required by retry command
 
     # Launch unprivileged & privileged pods
     kubectl run nginx-unprivileged --image=nginx:alpine
-    kubectl wait --for=condition=Ready pod nginx-unprivileged
-    kubectl run nginx-privileged --image=registry.k8s.io/pause --privileged
-    kubectl wait --for=condition=Ready pod nginx-privileged
+    wait_for pod nginx-unprivileged
+    kubectl run nginx-privileged --image=rancher/pause:3.2 --privileged
+    wait_for pod nginx-privileged
 
     # Deploy some policy
     apply_policy --no-wait privileged-pod-policy.yaml
@@ -141,8 +141,8 @@ export -f get_metrics # required by retry command
 
 @test "[OpenTelemetry Remote collector] Metrics are sent to remote Otel collector" {
     # Generate metric data
-    kubectl run pod-privileged --image=registry.k8s.io/pause --privileged
-    kubectl wait --for=condition=Ready pod pod-privileged
+    kubectl run pod-privileged --image=rancher/pause:3.2 --privileged
+    wait_for pod pod-privileged
     kubectl delete --wait pod pod-privileged
 
     retry 'test $(get_metrics my-collector-collector | grep "kubewarden_policy_total" | wc -l) -gt 1'

@@ -19,8 +19,8 @@ teardown_file() {
     kubectl create ns ctx-test
     kubectl annotate namespaces ctx-test propagate.hello=world
 
-    kubectl run --namespace ctx-test pause-user-group --image registry.k8s.io/pause
-    kubectl wait --for=condition=Ready pod --namespace ctx-test pause-user-group
+    kubectl run --namespace ctx-test pause-user-group --image rancher/pause:3.2
+    wait_for pod --namespace ctx-test pause-user-group
     kubectl get pod --namespace ctx-test pause-user-group -o json | jq -e '.metadata.labels["hello"]=="world"'
     kubectl delete namespace ctx-test
 

@@ -19,12 +19,12 @@ teardown_file() {
 
     # Privileged pod in the kubewarden namespace (should work)
     kubectl run nginx-privileged --image=nginx:alpine --privileged -n $NAMESPACE
-    kubectl wait --for=condition=Ready pod nginx-privileged -n $NAMESPACE
+    wait_for pod nginx-privileged -n $NAMESPACE
     kubectl delete pod nginx-privileged -n $NAMESPACE
 
     # Unprivileged pod in default namespace (should work)
     kubectl run nginx-unprivileged --image=nginx:alpine
-    kubectl wait --for=condition=Ready pod nginx-unprivileged
+    wait_for pod nginx-unprivileged
     kubectl delete pod nginx-unprivileged
 }
 

@@ -17,10 +17,10 @@ teardown_file() {
 
     # Launch unprivileged pod
     kubectl run nginx-unprivileged --image=nginx:alpine
-    kubectl wait --for=condition=Ready pod nginx-unprivileged
+    wait_for pod nginx-unprivileged
 
     # Launch privileged pod (should fail)
-    kubefail_privileged run pod-privileged --image=registry.k8s.io/pause --privileged
+    kubefail_privileged run pod-privileged --image=rancher/pause:3.2 --privileged
 }
 
 # Update pod-privileged policy to block only UPDATE of privileged pods
@@ -45,8 +45,8 @@ teardown_file() {
     apply_policy psp-user-group-policy.yaml
 
     # Policy should mutate pods
-    kubectl run pause-user-group --image registry.k8s.io/pause
-    kubectl wait --for=condition=Ready pod pause-user-group
+    kubectl run pause-user-group --image rancher/pause:3.2
+    wait_for pod pause-user-group
     kubectl get pods pause-user-group -o json | jq -e ".spec.containers[].securityContext.runAsUser==1000"
 
     delete_policy psp-user-group-policy.yaml

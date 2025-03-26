@@ -85,7 +85,7 @@ make_version_map() {
                 {
                     ($v): remap(map(select(.app_version == $v))),
                     next: remap($latest),
-                    prev: remap(map(select(.app_version != $latest[0].app_version and (.app_version | contains("-rc") | not)))),
+                    prev: remap(map(select(.app_version != $latest[0].app_version and (.app_version | test("-rc|-beta|-alpha") | not)))),
                 }' > "$tempfile"
     fi
 

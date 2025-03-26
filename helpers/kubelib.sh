@@ -10,6 +10,10 @@ info () { log 0  "  ${*}"; }
 warn () { log 33 "  ${*}"; }
 error() { log 31 "  ${*}"; }
 
+# Check github truthy | falsy variables
+gh_true() { ! is_false "$1"; }
+gh_false() { [[ "${!1:-}" =~ ^(false|0|-0|null)$ ]]; }
+
 # ==================================================================================================
 # Kubernetes helpers
 
@@ -58,7 +62,8 @@ function wait_nodes() {
     done
 }
 
-function wait_for    () { kubectl wait --timeout=5m "$@"; }
+# Wait for Ready condition by default, could be overridden with --for=condition=...
+function wait_for    () { kubectl wait --timeout=5m --for=condition=Ready "$@"; }
 # Wait for terminating pods after rollout
 function wait_rollout() { kubectl rollout status --timeout=5m "$@"; wait_pods; }
 
