@@ -23,6 +23,20 @@ CLUSTER_CONTEXT ?= $(shell kubectl config current-context)
 #   CRDS_ARGS, DEFAULTS_ARGS, CONTROLLER_ARGS
 
 # ==================================================================================================
+# Github boolean "false" is interpreted as a string (true) by bash
+# Github falsy values (false, 0, -0, "", '', null) are coerced to false
+
+# Boolean variables from github workflow
+VARIABLES = MTLS LATEST UPGRADE
+
+define is_falsy
+$(filter false 0 -0 "" '' null,$($(1)))
+endef
+
+# Process each variable - if it has a falsy value, override it to be empty
+$(foreach var,$(VARIABLES),$(if $(call is_falsy,$(var)),$(eval override $(var)=),))
+
+# ==================================================================================================
 # Targets
 
 .PHONY: clean cluster install upgrade uninstall tests all

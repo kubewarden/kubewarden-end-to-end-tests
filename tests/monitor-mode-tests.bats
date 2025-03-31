@@ -28,7 +28,7 @@ teardown_file() {
     apply_policy privileged-pod-policy.yaml
 
     # Launch privileged pod (should fail)
-    kubefail_privileged run pod-privileged --image=registry.k8s.io/pause --privileged
+    kubefail_privileged run pod-privileged --image=rancher/pause:3.2 --privileged
 }
 
 @test "[Monitor mode end-to-end tests] Transition from protect to monitor should be disallowed" {
