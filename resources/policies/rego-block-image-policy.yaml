@@ -1,0 +1,44 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicy
+metadata:
+  annotations:
+    io.kubewarden.policy.category: software-supply-chain
+    io.kubewarden.policy.severity: high
+  name: containers-block-specific-image-names
+spec:
+  module: registry://ghcr.io/kubewarden/policies/containers-block-specific-image-names:v1.0.1
+  settings:
+    restricted_image_names:
+      - "nginx"
+  rules:
+  - apiGroups:
+    - batch
+    apiVersions:
+    - v1
+    resources:
+    - cronjobs
+    - jobs
+    operations:
+    - CREATE
+    - UPDATE
+  - apiGroups:
+    - apps
+    apiVersions:
+    - v1
+    resources:
+    - daemonsets
+    - deployments
+    - statefulsets
+    operations:
+    - CREATE
+    - UPDATE
+  - apiGroups:
+    - ''
+    apiVersions:
+    - v1
+    resources:
+    - pods
+    operations:
+    - CREATE
+    - UPDATE
+  mutating: false
