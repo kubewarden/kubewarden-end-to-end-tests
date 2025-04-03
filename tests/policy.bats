@@ -8,6 +8,7 @@ setup() {
 teardown_file() {
     load ../helpers/helpers.sh
     kubectl delete pods --all
+    kubectl delete ap,cap,capg --all -A
     kubectl delete ns shouldbeignored --ignore-not-found
     helmer reset kubewarden-defaults
 }
@@ -61,4 +62,38 @@ POLICY_NUMBER=6
     helmer set kubewarden-defaults --set recommendedPolicies.enabled=False
     kubectl run pod-privileged --image=rancher/pause:3.2 --privileged
     kubectl delete pod pod-privileged
+}
+
+@test "[Rego policy] Make sure rego policy is still working" {
+    # Block nginx image usage
+    apply_policy rego-block-image-policy.yaml
+    run ! kuberun --image=nginx
+    assert_output --regexp '^Error.*: admission webhook.*denied the request.*These images should be blocked.*$'
+    delete_policy rego-block-image-policy.yaml
+}
+
+@test "[Policy group] Apply policy group to block privileged escalation and shared pid namespace pods" {
+    apply_policy policy-group-escalation-shared-pid.yaml
+
+    # I can not create pod using privileged escalation only
+    kubefail_policy_group run nginx-denied-privi-escalation --image=nginx:alpine \
+        --overrides='{"spec":{"containers":[{"name":"nginx-denied-privi-escalation","image":"nginx:alpine","securityContext":{"allowPrivilegeEscalation":true}}]}}'
+
+    # I can not create pod using shared pid namespace only
+    kubefail_policy_group run nginx-denied-shared-pid --image=nginx:alpine \
+        --overrides='{"spec":{"shareProcessNamespace":true}}'
+
+    # I can create pod using shared pid namespace with the mandatory annotation
+    kubectl run nginx-shared-pid --image=nginx:alpine --annotations="super_pod=true" \
+        --overrides='{"spec":{"shareProcessNamespace":true}}'
+
+    # I can create pod using privileged escalation with the mandatory annotation
+    kubectl run nginx-privi-escalation --image=nginx:alpine --annotations="super_pod=true" \
+        --overrides='{"spec":{"containers":[{"name":"nginx-privi-escalation","image":"nginx:alpine","securityContext":{"allowPrivilegeEscalation":true}}]}}'
+
+    # I can create pod using privileged escalation and shared pid namespace with the mandatory annotation
+    kubectl run nginx-privi-escalation-shared-pid --image=nginx:alpine --annotations="super_pod=true" \
+        --overrides='{"spec":{"shareProcessNamespace":true,"containers":[{"name":"nginx-privi-escalation-shared-pid","image":"nginx:alpine","securityContext":{"allowPrivilegeEscalation":true}}]}}'
+
+    delete_policy policy-group-escalation-shared-pid.yaml
 }

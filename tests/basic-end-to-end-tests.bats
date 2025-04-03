@@ -61,29 +61,3 @@ teardown_file() {
 
     kubectl delete ps e2e-tests
 }
-
-@test "[Basic end-to-end tests] Apply policy group to block privileged escalation and shared pid namespace pods" {
-    apply_policy policy-group-escalation-shared-pid.yaml
-
-    # I can not create pod using privileged escalation only
-    kubefail_policy_group run nginx-denied-privi-escalation --image=nginx:alpine \
-        --overrides='{"spec":{"containers":[{"name":"nginx-denied-privi-escalation","image":"nginx:alpine","securityContext":{"allowPrivilegeEscalation":true}}]}}'
-
-    # I can not create pod using shared pid namespace only
-    kubefail_policy_group run nginx-denied-shared-pid --image=nginx:alpine \
-        --overrides='{"spec":{"shareProcessNamespace":true}}'
-
-    # I can create pod using shared pid namespace with the mandatory annotation
-    kubectl run nginx-shared-pid --image=nginx:alpine --annotations="super_pod=true" \
-        --overrides='{"spec":{"shareProcessNamespace":true}}'
-
-    # I can create pod using privileged escalation with the mandatory annotation
-    kubectl run nginx-privi-escalation --image=nginx:alpine --annotations="super_pod=true" \
-        --overrides='{"spec":{"containers":[{"name":"nginx-privi-escalation","image":"nginx:alpine","securityContext":{"allowPrivilegeEscalation":true}}]}}'
-
-    # I can create pod using privileged escalation and shared pid namespace with the mandatory annotation
-    kubectl run nginx-privi-escalation-shared-pid --image=nginx:alpine --annotations="super_pod=true" \
-        --overrides='{"spec":{"shareProcessNamespace":true,"containers":[{"name":"nginx-privi-escalation-shared-pid","image":"nginx:alpine","securityContext":{"allowPrivilegeEscalation":true}}]}}'
-
-    delete_policy policy-group-escalation-shared-pid.yaml
-}
