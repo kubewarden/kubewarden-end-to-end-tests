@@ -64,12 +64,25 @@ POLICY_NUMBER=6
     kubectl delete pod pod-privileged
 }
 
-@test "[Rego policy] Make sure rego policy is still working" {
-    # Block nginx image usage
+@test "[Rego policy] Apply rego policy to block nginx image usage" {
     apply_policy rego-block-image-policy.yaml
+
     run ! kuberun --image=nginx
     assert_output --regexp '^Error.*: admission webhook.*denied the request.*These images should be blocked.*$'
     delete_policy rego-block-image-policy.yaml
+}
+
+@test "[CEL policies] Apply CEL policy to block deployment with replicas < 3" {
+    apply_policy cel-policy.yaml
+
+    # Deployment should fail because replicas < 3
+    run ! kubectl create deployment cel-policy-test --image nginx --replicas 2
+    assert_output --regexp '^error:.*admission webhook.*denied the request.*The number of replicas must be greater than or equal to 3$'
+    
+    # Deployment should work because replicas >= 3
+    kubectl create deployment cel-policy-test --image nginx --replicas 3
+    kubectl delete deployment cel-policy-test
+    delete_policy cel-policy.yaml
 }
 
 @test "[Policy group] Apply policy group to block privileged escalation and shared pid namespace pods" {

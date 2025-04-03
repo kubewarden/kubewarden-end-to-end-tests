@@ -1,0 +1,23 @@
+apiVersion: policies.kubewarden.io/v1
+kind: AdmissionPolicy
+metadata:
+  annotations:
+    io.kubewarden.policy.category: Resource validation
+    io.kubewarden.policy.severity: low
+  name: "cel-replicas-policy"
+spec:
+  module: registry://ghcr.io/kubewarden/policies/cel-policy:latest
+  settings:
+    variables:
+      - name: "replicas"
+        expression: "object.spec.replicas"
+    validations:
+      - expression: "variables.replicas >= 3"
+        message: "The number of replicas must be greater than or equal to 3"
+  rules:
+    - apiGroups: ["apps"]
+      apiVersions: ["v1"]
+      operations: ["CREATE", "UPDATE"]
+      resources: ["deployments"]
+  mutating: false
+  backgroundAudit: false
