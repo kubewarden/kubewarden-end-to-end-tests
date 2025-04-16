@@ -30,7 +30,7 @@ function create_configmap {
 
 function get_policy_server_status {
     # get latest policy-server pod
-    local podname=$(kubectl get pods -n kubewarden --selector=app=kubewarden-policy-server-default --sort-by=.metadata.creationTimestamp -o jsonpath="{.items[-1].metadata.name}")
+    local podname=$(kubectl get pods -n kubewarden --selector=app.kubernetes.io/instance=policy-server-default --sort-by=.metadata.creationTimestamp -o jsonpath="{.items[-1].metadata.name}")
     # fill output with logs, 10s timeout because pod restart cleans up
     kubectl logs -n $NAMESPACE $podname --request-timeout=10s -f
 
