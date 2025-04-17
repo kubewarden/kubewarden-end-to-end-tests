@@ -49,8 +49,14 @@ $(TESTFILES):
 	CLUSTER_CONTEXT=$(CLUSTER_CONTEXT) \
 	bats -T --print-output-on-failure $(TESTS_DIR)/$@
 
-# Target all non-destructive tests
-tests: $(filter-out audit-scanner-installation.bats, $(TESTFILES))
+# Filter out audit-scanner-installation because it reinstalls kubewarden
+FILTERED := $(filter-out audit-scanner-installation.bats, $(TESTFILES))
+# Filter out mutual-tls if MTLS is not set
+ifeq ($(MTLS),)
+    FILTERED := $(filter-out mutual-tls.bats, $(TESTFILES))
+endif
+# Target all standard tests
+tests: $(FILTERED)
 
 cluster:
 	./scripts/cluster_k3d.sh create

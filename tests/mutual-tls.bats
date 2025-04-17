@@ -1,4 +1,6 @@
 #!/usr/bin/env bats
+
+# mTLS has to be enabled on cluster level
 # https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/
 
 setup() {
@@ -13,9 +15,6 @@ teardown_file() {
     kubectl delete ps mtls-pserver --ignore-not-found
     helmer reset kubewarden-controller
 }
-
-# mTLS has to be enabled on the cluster, use MTLS=1 to indicate that
-[[ "${MTLS:-}" =~ ^(false|0)?$ ]] && skip "Mutual TLS is disabled on cluster"
 
 function curlpod { kubectl exec curlpod -- curl -k --no-progress-meter $@; }
 
