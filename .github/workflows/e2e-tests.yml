@@ -47,9 +47,7 @@ jobs:
           ref: 'main'
           submodules: 'true'
       - name: "Setup bats testing framework"
-        uses: mig4/setup-bats@v1.2.0
-        with:
-          bats-version: 1.11.1
+        run: sudo apt install -y bats
       - name: "Install kwctl"
         uses: kubewarden/github-actions/kwctl-installer@main
         with:
