@@ -11,6 +11,10 @@ teardown_file() {
     kubectl delete ap,cap,capg --all -A
 }
 
+@test "[Basic end-to-end tests] Helm app version is consistent" {
+    helm list -n $NAMESPACE -o json | jq 'map(.app_version) | unique | length == 1'
+}
+
 # Create pod-privileged policy to block CREATE & UPDATE of privileged pods
 @test "[Basic end-to-end tests] Apply pod-privileged policy that blocks CREATE & UPDATE" {
     apply_policy privileged-pod-policy.yaml
