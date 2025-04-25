@@ -37,20 +37,20 @@ function assert_cronjob {
     fi
 }
 
-@test "[Audit Scanner] Reconfigure audit scanner" {
+@test "[Audit Scanner Installation] Reconfigure audit scanner" {
     helmer set kubewarden-controller --set auditScanner.cronJob.schedule="*/30 * * * *"
     run kubectl get cronjob -n $NAMESPACE
     assert_output -p audit-scanner
     assert_output -p "*/30 * * * *"
 }
 
-@test "[Audit Scanner] Audit scanner resources are cleaned with kubewarden" {
+@test "[Audit Scanner Installation] Audit scanner resources are cleaned with kubewarden" {
     kubewarden_uninstall
     assert_crds false
     assert_cronjob false
 }
 
-@test "[Audit Scanner] Install with CRDs pre-installed" {
+@test "[Audit Scanner Installation] Install with CRDs pre-installed" {
     # Install kubewarden with custom policyreport-crds
     kubectl create -f $CRD_BASE/wgpolicyk8s.io_policyreports.yaml
     kubectl create -f $CRD_BASE/wgpolicyk8s.io_clusterpolicyreports.yaml
@@ -75,7 +75,7 @@ function assert_cronjob {
     assert_crds false
 }
 
-@test "[Audit Scanner] Install with CRDs from Kubewarden Helm charts" {
+@test "[Audit Scanner Installation] Install with CRDs from Kubewarden Helm charts" {
     helmer reinstall
     assert_crds true
     assert_cronjob true
