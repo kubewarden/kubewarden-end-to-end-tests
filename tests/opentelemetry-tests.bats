@@ -48,8 +48,10 @@ export -f get_metrics # required by retry command
 
     # OpemTelementry
     helm repo add --force-update open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+    # v0.86.4 - https://github.com/open-telemetry/opentelemetry-helm-charts/issues/1648
     helm upgrade -i --wait my-opentelemetry-operator open-telemetry/opentelemetry-operator \
         --set "manager.collectorImage.repository=otel/opentelemetry-collector-contrib" \
+        --version 0.86.4 \
         -n open-telemetry --create-namespace
 
     # Prometheus
