@@ -1,0 +1,138 @@
+#!/bin/bash
+
+# Build Airgap
+
+set -vx
+
+# Error function
+function error() {
+  echo -e "$@" >&2
+  exit 1
+}
+
+# Retry helm command in case of sporadic issue
+function RunHelmCmdWithRetry() {
+  # Wait for a maximum of 1 minute
+  for ((i = 0; i < 60; i++)); do
+    # If helm command is OK then we simply return (exit the function)
+    helm $* && return
+
+    # Wait a little
+    sleep 5
+  done
+
+  # If we are here then an error happened!
+  exit 1
+}
+
+# Retry skopeo command in case of sporadic issue
+function RunSkopeoCmdWithRetry() {
+  CMD=$*
+
+  # Wait for a maximum of 1 minute
+  for ((i = 0; i < 60; i++)); do
+    # If skopeo command is OK then we simply return (exit the function)
+    ERRMSG=$(skopeo ${CMD} 2>&1 >/dev/null) && return
+
+    # If resource access is denied retry with local access
+    case ${ERRMSG} in
+    *requested\ access\ to\ the\ resource\ is\ denied*)
+      CMD=${CMD/docker:\/\//docker-daemon:}
+      ;;
+    *Storing\ signatures\ for\ docker\ tar\ files\ is\ not\ supported*)
+      CMD=${CMD/copy/copy --remove-signatures}
+      ;;
+    esac
+
+    # Wait a little
+    sleep 5
+  done
+
+  # If we are here then an error happened!
+  exit 1
+}
+
+# Variable(s)
+K3S_VERSION=$1
+#KUBEWARDEN_VERSION=$2
+KUBEWARDEN_VERSION=latest
+KUBEWARDEN_REPO=https://charts.kubewarden.io
+DEPLOY_AIRGAP_SCRIPT=$(realpath ../scripts/deploy-airgap)
+OPT_RANCHER="${HOME}/airgap_rancher"
+HAULER_BIN=/usr/local/bin/hauler
+REPO_SERVER="rancher-manager.test:5000"
+
+# Install hauler
+curl -sfL https://get.hauler.dev | HAULER_INSTALL_DIR=$HOME bash
+sudo mv $HOME/hauler ${HAULER_BIN}
+
+# Install packages
+sudo zypper --no-refresh -n in skopeo yq
+
+# Create directories
+mkdir -p ${OPT_RANCHER}/{k3s,helm} ${OPT_RANCHER}/images/registry
+cd ${OPT_RANCHER}
+
+# Add rancher manager in /etc/hosts
+sudo sh -c "echo '192.168.122.102 ${REPO_SERVER%:*}' >> /etc/hosts"
+
+# Download k3s
+K3S_URL=https://github.com/k3s-io/k3s/releases/download/$K3S_VERSION
+for i in k3s-airgap-images-amd64.tar.zst k3s; do
+  curl -sL ${K3S_URL}/${i} -o ${OPT_RANCHER}/k3s/${i}
+
+  # Get the install script
+  curl -sfL https://get.k3s.io -o ${OPT_RANCHER}/k3s/install.sh
+
+  # Get the airgap deploy script
+  cp ${DEPLOY_AIRGAP_SCRIPT} ${OPT_RANCHER}/k3s
+done
+
+# Add k3s artifacts to hauler
+${HAULER_BIN} store add file ${OPT_RANCHER}/k3s
+
+# Get Helm Charts
+cd ${OPT_RANCHER}/helm/
+
+# Add repos
+RunHelmCmdWithRetry repo add kubewarden ${KUBEWARDEN_REPO} >/dev/null 2>&1
+RunHelmCmdWithRetry repo update >/dev/null 2>&1
+
+# Get Kubewarden charts
+[[ "${KUBEWARDEN_VERSION}" == "latest" ]] &&
+  DEVEL="--devel" ||
+  unset DEVEL
+for i in kubewarden-crds kubewarden-controller kubewarden-defaults; do
+  RunHelmCmdWithRetry pull ${DEVEL} kubewarden/${i} >/dev/null 2>&1
+done
+
+# Get container images
+cd ${OPT_RANCHER}/images/
+
+# Kubewarden image list
+# TODO: Download the list of images from the repo instead of hardcoding them
+KUBEWARDEN_IMAGES_FILE="ghcr.io/kubewarden/audit-scanner:latest ghcr.io/kubewarden/kubectl:v1.31.0 ghcr.io/kubewarden/kubewarden-controller:latest \
+ghcr.io/kubewarden/policy-server:latest ghcr.io/kyverno/policy-reporter-ui:latest ghcr.io/kyverno/policy-reporter:latest"
+
+KUBEWARDEN_POLICIES_FILE="ghcr.io/kubewarden/policies/allow-privilege-escalation-psp:v1.0.0 ghcr.io/kubewarden/policies/capabilities-psp:v1.0.0 \
+ghcr.io/kubewarden/policies/host-namespaces-psp:v1.0.0 ghcr.io/kubewarden/policies/hostpaths-psp:v1.0.0 \
+ghcr.io/kubewarden/policies/pod-privileged:v1.0.0 ghcr.io/kubewarden/policies/user-group-psp:v1.0.0"
+
+## Add helm chart in hauler
+cd ${OPT_RANCHER}
+${HAULER_BIN} store add chart ./helm/kubewarden-crds* --repo .
+${HAULER_BIN} store add chart ./helm/kubewarden-controller* --repo .
+${HAULER_BIN} store add chart ./helm/kubewarden-defaults* --repo .
+
+for i in $(echo ${KUBEWARDEN_IMAGES_FILE}) $(echo ${KUBEWARDEN_POLICIES_FILE}); do
+  ## Add image in hauler
+  ${HAULER_BIN} store add image ${i} --platform linux/amd64
+done
+
+## Skopeo - Registry
+# We need this image to build our internal registry
+RunSkopeoCmdWithRetry copy --additional-tag registry:latest docker://registry:latest docker-archive:registry.tar
+${HAULER_BIN} store add file registry.tar
+
+# Export the hauler store
+${HAULER_BIN} store save --platform linux/amd64
