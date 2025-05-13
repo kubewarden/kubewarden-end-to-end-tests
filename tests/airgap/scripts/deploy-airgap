@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# Deploy Airgap
+
+set -vx
+
+# Retry skopeo command in case of sporadic issue
+function RunSkopeoCmdWithRetry() {
+  CMD=$*
+
+  # Wait for a maximum of 1 minute
+  for ((i = 0; i < 60; i++)); do
+    # If skopeo command is OK then we simply return (exit the function)
+    ERRMSG=$(skopeo ${CMD} 2>&1 >/dev/null) && return
+
+    # If resource access is denied retry with local access
+    case ${ERRMSG} in
+    *requested\ access\ to\ the\ resource\ is\ denied*)
+      CMD=${CMD/docker:\/\//docker-daemon:}
+      ;;
+    *Storing\ signatures\ for\ docker\ tar\ files\ is\ not\ supported*)
+      CMD=${CMD/copy/copy --remove-signatures}
+      ;;
+    esac
+
+    # Wait a little
+    sleep 5
+  done
+
+  # If we are here then an error happened!
+  exit 1
+}
+
+# Variable(s)
+HAULER_BIN=/usr/local/bin/hauler
+K3S_VERSION=$1
+OPT_RANCHER=/opt/rancher
+
+# Extract hauler store
+cd ${OPT_RANCHER}
+${HAULER_BIN} store load --filename haul.tar.zst
+
+# Install k3s
+sudo sh -c "
+  ${HAULER_BIN} store extract k3s
+  cd k3s
+  mkdir -p /var/lib/rancher/k3s/agent/images /etc/rancher/k3s
+  cp k3s-airgap-images-amd64.tar.zst /var/lib/rancher/k3s/agent/images/
+  chmod +x k3s install.sh
+  cp k3s /usr/local/bin/
+  cd ..
+"
+
+# Add registry configuration
+cat <<EOF | sudo tee /etc/rancher/k3s/registries.yaml
+mirrors:
+  "rancher-manager.test:5000":
+    endpoint:
+      - "http://rancher-manager.test:5000"
+configs:
+  "rancher-manager.test:5000":
+    tls:
+      insecure_skip_verify: true
+EOF
+
+# Pre-load registry image
+sudo sh -c "${HAULER_BIN} store extract hauler/registry.tar -o /var/lib/rancher/k3s/agent/images/"
+
+# Install k3s
+INSTALL_K3S_SKIP_DOWNLOAD=true INSTALL_K3S_VERSION=${K3S_VERSION} ./k3s/install.sh
+systemctl enable --now k3s
+
+# Wait and add link
+sleep 30
+mkdir -p ${HOME}/.kube
+ln -sf /etc/rancher/k3s/k3s.yaml ${HOME}/.kube/config
+
+# Run local registry
+cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: registry
+  labels:
+    app: registry
+spec:
+  selector:
+    matchLabels:
+      app: registry
+  template:
+    metadata:
+      labels:
+        app: registry
+    spec:
+      containers:
+      - name: registry
+        image: registry
+        imagePullPolicy: Never
+        ports:
+        - name: registry
+          containerPort: 5000
+        securityContext:
+          capabilities:
+            add:
+            - NET_BIND_SERVICE
+        volumeMounts:
+        - name: registry
+          mountPath: /var/lib/registry
+      volumes:
+      - name: registry
+        hostPath:
+          path: ${OPT_RANCHER}/registry
+      hostNetwork: true
+EOF
+
+# Wait for registry to be ready
+sleep 1m
+
+# Load images inside the local registry
+IMAGES_PATH=${OPT_RANCHER}/images
+${HAULER_BIN} store copy registry://localhost:5000
