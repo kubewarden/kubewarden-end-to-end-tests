@@ -26,7 +26,7 @@ POLICY_NUMBER=6
     wait_policies PolicyUniquelyReachable
 
     # Check we get the correct recommended policies number
-    kubectl --no-headers=true get ap,cap,apg,capg -A | wc -l | grep -qx $POLICY_NUMBER 
+    kubectl --no-headers=true get ap,cap,apg,capg -A | wc -l | grep -qx $POLICY_NUMBER
 }
 
 @test "[Recommended policies] Check that policies are enforced" {
@@ -78,7 +78,7 @@ POLICY_NUMBER=6
     # Deployment should fail because replicas < 3
     run ! kubectl create deployment cel-policy-test --image nginx --replicas 2
     assert_output --regexp '^error:.*admission webhook.*denied the request.*The number of replicas must be greater than or equal to 3$'
-    
+
     # Deployment should work because replicas >= 3
     kubectl create deployment cel-policy-test --image nginx --replicas 3
     kubectl delete deployment cel-policy-test
