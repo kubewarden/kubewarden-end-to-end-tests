@@ -8,10 +8,10 @@ set -aeEuo pipefail
 K3S=${K3S:-$(k3d version -o json | jq -r '.k3s')}
 CLUSTER_NAME=${CLUSTER_NAME:-k3s-default}
 MASTER_COUNT=${MASTER_COUNT:-1}
-WORKER_COUNT=${WORKER_COUNT:-1}
+WORKER_COUNT=${WORKER_COUNT:-0}
 MTLS=${MTLS:-}
 
-# Complete partial K3S version from dockerhub
+# Complete partial K3S version from dockerhub v1.30 -> v1.30.5-k3s1
 if [[ ! $K3S =~ ^v[0-9.]+-k3s[0-9]$ ]]; then
     K3S=$(curl -L -s "https://registry.hub.docker.com/v2/repositories/rancher/k3s/tags?page_size=20&name=$K3S" | jq -re 'first(.results[].name | select(test("^v[0-9.]+-k3s[0-9]$")))')
     echo "K3S version: $K3S"
@@ -32,9 +32,10 @@ if [ "${1:-}" == 'create' ]; then
         -s $MASTER_COUNT -a $WORKER_COUNT \
         --registry-create k3d-$CLUSTER_NAME-registry \
         --registry-config <(echo "${K3D_REGISTRY_CONFIG:-}") \
-        -v /dev/mapper:/dev/mapper \
+        -v /dev/mapper:/dev/mapper@all \
         ${MTLS:+--k3s-arg '--kube-apiserver-arg=admission-control-config-file=/etc/mtls/admission.yaml@server:*'} \
-        ${MTLS:+--volume "$MTLS_DIR:/etc/mtls@server:*"}
+        ${MTLS:+--volume "$MTLS_DIR:/etc/mtls@server:*"} \
+        "${@:2}"
 
     wait_pods -n kube-system
 fi
