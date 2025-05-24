@@ -1,14 +1,17 @@
-.DEFAULT_GOAL := all
+.DEFAULT_GOAL := check
 
-MKFILE_DIR ?= $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-TESTS_DIR ?= $(MKFILE_DIR)tests
-RESOURCES_DIR ?= $(MKFILE_DIR)resources
+MKFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+TESTS_DIR := $(MKFILE_DIR)tests
+RESOURCES_DIR := $(MKFILE_DIR)resources
 
 NAMESPACE ?= kubewarden
 CLUSTER_CONTEXT ?= $(shell kubectl config current-context)
 
 # ==================================================================================================
 # Optional arguments for scripts
+
+# Requires bats >= v1.12.0
+# KEEP=1 # Skip teardown on failure
 
 # cluster_k3d.sh:
 #   MTLS=1
@@ -37,26 +40,44 @@ endef
 $(foreach var,$(VARIABLES),$(if $(call is_falsy,$(var)),$(eval override $(var)=),))
 
 # ==================================================================================================
-# Targets
-
-.PHONY: clean cluster install upgrade uninstall tests all
 
 # Generate target for every test file
-TESTFILES := $(notdir $(wildcard tests/*.bats))
-$(TESTFILES):
-	@RESOURCES_DIR=$(RESOURCES_DIR) \
-	NAMESPACE=$(NAMESPACE) \
-	CLUSTER_CONTEXT=$(CLUSTER_CONTEXT) \
-	bats -T --print-output-on-failure $(TESTS_DIR)/$@
-
+TESTFILES := $(notdir $(wildcard $(TESTS_DIR)/*.bats))
 # Filter out audit-scanner-installation because it reinstalls kubewarden
 FILTERED := $(filter-out audit-scanner-installation.bats, $(TESTFILES))
 # Filter out mutual-tls if MTLS is not set
 ifeq ($(MTLS),)
-    FILTERED := $(filter-out mutual-tls.bats, $(TESTFILES))
+    FILTERED := $(filter-out mutual-tls.bats, $(FILTERED))
 endif
-# Target all standard tests
-tests: $(FILTERED)
+# Remove requested .bats targets from FILTERED to avoid duplicates
+FILTERED := $(filter-out $(filter %.bats,$(MAKECMDGOALS)), $(FILTERED))
+
+# If 'tests' appears in goals, substitute it with FILTERED tests
+# Otherwise include any specified *.bats files in goals
+BATS_SELECTED := $(strip $(foreach goal,$(MAKECMDGOALS),\
+    $(if $(filter tests,$(goal)),$(FILTERED),\
+    $(if $(filter %.bats,$(goal)),$(goal)))))
+# If no goals specified, use filtered tests
+BATS_SELECTED := $(or $(BATS_SELECTED),$(FILTERED))
+
+# ==================================================================================================
+# Use .run-bats to call bats only once per execution. Required to abort tests on failure
+
+.PHONY: .run_bats tests $(TESTFILES)
+
+.run_bats:
+	@echo "Running BATS tests: $(BATS_SELECTED)"
+	@RESOURCES_DIR="$(RESOURCES_DIR)" \
+	NAMESPACE="$(NAMESPACE)" \
+	CLUSTER_CONTEXT="$(CLUSTER_CONTEXT)" \
+	bats -T --print-output-on-failure $(addprefix $(TESTS_DIR)/, $(BATS_SELECTED))
+
+tests $(TESTFILES): .run_bats
+	@:
+
+# ==================================================================================================
+
+.PHONY: clean cluster install rancher upgrade uninstall all check
 
 cluster:
 	./scripts/cluster_k3d.sh create
@@ -65,7 +86,7 @@ install: check
 	./scripts/helmer.sh install
 
 rancher:
-	./scripts/rancher.sh install
+	./scripts/rancher.sh
 
 upgrade:
 	./scripts/helmer.sh upgrade
@@ -76,7 +97,7 @@ uninstall:
 clean:
 	./scripts/cluster_k3d.sh delete
 
-all: clean cluster install tests
+all: clean cluster install
 
 check:
 	@yq --version | grep mikefarah > /dev/null || { echo "yq is not the correct, needs mikefarah/yq!"; exit 1; }
@@ -86,3 +107,4 @@ check:
 	@kubectl version --client > /dev/null || { echo "kubectl is not installed!"; exit 1; }
 	@helm version > /dev/null || { echo "helm is not installed!"; exit 1; }
 	@bats --version > /dev/null || { echo "bats is not installed!"; }
+	@echo "Dependency check passed."

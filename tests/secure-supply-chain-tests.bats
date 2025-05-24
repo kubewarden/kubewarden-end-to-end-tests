@@ -12,13 +12,10 @@
 CONFIGMAP_NAME="ssc-verification-config"
 
 setup() {
-    load ../helpers/helpers.sh
-    wait_pods
+    setup_helper
 }
-
 teardown_file() {
-    load ../helpers/helpers.sh
-    kubectl delete admissionpolicies,clusteradmissionpolicies --all -A
+    teardown_helper
     helmer reset kubewarden-defaults
     kubectl delete configmap -n $NAMESPACE $CONFIGMAP_NAME --ignore-not-found
 }

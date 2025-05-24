@@ -4,14 +4,10 @@
 # https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/
 
 setup() {
-    load ../helpers/helpers.sh
-    wait_pods
+    setup_helper
 }
-
 teardown_file() {
-    load ../helpers/helpers.sh
-    kubectl delete pods --all
-    kubectl delete ap,cap --all
+    teardown_helper
     kubectl delete ps mtls-pserver --ignore-not-found
     helmer reset kubewarden-controller
 }

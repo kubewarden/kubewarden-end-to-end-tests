@@ -1,14 +1,10 @@
 #!/usr/bin/env bats
 
 setup() {
-    load ../helpers/helpers.sh
-    wait_pods
+    setup_helper
 }
-
 teardown_file() {
-    load ../helpers/helpers.sh
-    kubectl delete pods --all
-    kubectl delete ap,cap,capg --all -A
+    teardown_helper
     kubectl delete ns shouldbeignored --ignore-not-found
     helmer reset kubewarden-defaults
 }

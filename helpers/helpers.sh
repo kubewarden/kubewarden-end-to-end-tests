@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-
-bats_require_minimum_version 1.7.0
+set -aeEuo pipefail
 
 load "../helpers/bats-support/load.bash"
 load "../helpers/bats-assert/load.bash"
@@ -17,6 +16,37 @@ helmer()  { $BATS_TEST_DIRNAME/../scripts/helmer.sh "$@"; }
 export -f kubectl helm
 
 # ==================================================================================================
+
+setup_helper() {
+    # Stop after the first failure
+    [ ! -f ${BATS_RUN_TMPDIR}/.skip ] || skip "fail"
+
+    # Write skip file on failure
+    bats::on_failure() {
+        echo "$BATS_TEST_FILENAME" > ${BATS_RUN_TMPDIR}/.skip
+        # Collect logs (here or teardown?)
+        # kubectl logs -n kubewarden -l app.kubernetes.io/component=controller
+        # kubectl logs -n kubewarden -l app.kubernetes.io/component=policy-server
+    }
+
+    # Wait for kubewarden pods unless --no-wait tag is set
+    [[ $BATS_TEST_TAGS =~ setup:--no-wait ]] || wait_pods -n $NAMESPACE
+}
+
+# Skip teardown if tests failed & KEEP is set
+teardown_helper() {
+    # Conditional skip (based on .skip file & KEEP var)
+    if [[ -f "$BATS_RUN_TMPDIR/.skip" ]]; then
+        if [[ "$BATS_TEST_FILENAME" == "$(< $BATS_RUN_TMPDIR/.skip)" ]]; then
+            [[ -n "${KEEP:-}" ]] && skip "skip teardown of failed test"
+        else
+            skip "skip teardown of remaining tests"
+        fi
+    fi
+    # Common teardown
+    kubectl delete pods --all
+    kubectl delete ap,cap,apg,capg --all -A
+}
 
 trigger_audit_scan() {
     local jobname=${1:-auditjob}
