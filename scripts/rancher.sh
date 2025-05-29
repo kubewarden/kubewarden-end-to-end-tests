@@ -50,13 +50,13 @@ create_k3d_cluster() {
 # Add rancher repositories
 helm_add_repositories() {
     ar() { helm repo ls | grep -q "^$1[[:space:]]" || helm repo add "$1" "$2"; }
-    ar jetstack https://charts.jetstack.io
-    ar rancher-prime https://charts.rancher.com/server-charts/prime
-    ar rancher-primerc https://charts.optimus.rancher.io/server-charts/latest
-    ar rancher-primealpha https://charts.optimus.rancher.io/server-charts/alpha
-    ar rancher-community https://releases.rancher.com/server-charts/latest
-    ar rancher-communityalpha https://releases.rancher.com/server-charts/alpha
-    helm repo update rancher-prime rancher-primerc rancher-primealpha rancher-community rancher-communityalpha > /dev/null
+    ar e2e-jetstack https://charts.jetstack.io
+    ar e2e-rancher-prime https://charts.rancher.com/server-charts/prime
+    ar e2e-rancher-primerc https://charts.optimus.rancher.io/server-charts/latest
+    ar e2e-rancher-primealpha https://charts.optimus.rancher.io/server-charts/alpha
+    ar e2e-rancher-community https://releases.rancher.com/server-charts/latest
+    ar e2e-rancher-communityalpha https://releases.rancher.com/server-charts/alpha
+    helm repo update e2e-rancher-prime e2e-rancher-primerc e2e-rancher-primealpha e2e-rancher-community e2e-rancher-communityalpha e2e-jetstack > /dev/null
 }
 
 # Find repository & highest version based on constraints
@@ -76,18 +76,18 @@ find_chart_by_constraints () {
 
     # Find charts from Q_REPOs with version matching Q_VER, ordered by version
     [[ "$q_ver" =~ $EXCLUDE_PATTERN ]] || local expattern="$EXCLUDE_PATTERN"
-    charts=$(helm search repo --fail-on-no-result -r "$q_repo.*/rancher" --version "$q_ver" --versions -o json |\
+    charts=$(helm search repo --fail-on-no-result -r "e2e-$q_repo.*/rancher" --version "$q_ver" --versions -o json |\
         jq -er --arg ex "${expattern:-}" '[.[] | select($ex == "" or (.version | test($ex) | not))] | unique_by(.name) | .[] | [.name, .version] | @tsv' | semsort -k2)
 
     # Same version can be in multiple repos (2.10.1 in prime, primerc, community)
     # Define repo priority: community > prime > communityalpha > primerc > primealpha
     CHART_VER=$(awk 'END {print $2}' <<< "$charts")
     CHART_REPO=$(grep -F "$CHART_VER" <<< "$charts" | sed -E '
-        s|rancher-community/|1 &|
-        s|rancher-prime/|2 &|
-        s|rancher-communityalpha/|3 &|
-        s|rancher-primerc/|4 &|
-        s|rancher-primealpha/|5 &|' \
+        s|e2e-rancher-community/|1 &|
+        s|e2e-rancher-prime/|2 &|
+        s|e2e-rancher-communityalpha/|3 &|
+        s|e2e-rancher-primerc/|4 &|
+        s|e2e-rancher-primealpha/|5 &|' \
         | sort -nr | awk 'END {print $2}')
 
     echo "CHART: ${CHART_REPO:--}:${CHART_VER:--}"
@@ -125,7 +125,7 @@ RANCHER_FQDN=${RANCHER_FQDN:-$(kubectl get svc traefik -n kube-system -o jsonpat
 [[ $CHART_REPO =~ ^rancher-prime(alpha|rc) ]] && stgregistry=1
 
 # Install cert-manager
-helm install --wait cert-manager jetstack/cert-manager -n cert-manager --create-namespace --set crds.enabled=true
+helm install --wait cert-manager e2e-jetstack/cert-manager -n cert-manager --create-namespace --set crds.enabled=true
 
 # Install Rancher
 helm search repo "$CHART_REPO" --version "$CHART_VER"
