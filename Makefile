@@ -81,5 +81,8 @@ all: clean cluster install tests
 check:
 	@yq --version | grep mikefarah > /dev/null || { echo "yq is not the correct, needs mikefarah/yq!"; exit 1; }
 	@jq --version > /dev/null || { echo "jq is not installed!"; exit 1; }
+	@docker --version > /dev/null || { echo "docker is not installed!"; exit 1; }
 	@k3d --version > /dev/null || { echo "k3d is not installed!"; exit 1; }
-	@bats --version > /dev/null || { echo "bats is not installed!"; exit 1; }
+	@kubectl version --client > /dev/null || { echo "kubectl is not installed!"; exit 1; }
+	@helm version > /dev/null || { echo "helm is not installed!"; exit 1; }
+	@bats --version > /dev/null || { echo "bats is not installed!"; }
