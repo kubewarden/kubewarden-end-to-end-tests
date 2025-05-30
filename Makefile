@@ -83,7 +83,7 @@ tests $(TESTFILES): .run_bats
 cluster:
 	./scripts/cluster_k3d.sh create
 
-install: check
+install:
 	./scripts/helmer.sh install
 
 rancher:

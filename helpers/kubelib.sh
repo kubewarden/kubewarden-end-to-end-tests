@@ -30,7 +30,7 @@ function retry() {
     local i status
 
     for ((i=1; i<=tries; i++)); do
-        timeout $delay bash -c "$cmd" && break || status=$?
+        timeout "$delay" bash -c "$cmd" && break || status=$?
         if [[ $i -lt $tries ]]; then
             echo "RETRY #$i: $cmd"
             [[ $status -ne 124 ]] && sleep $delay
@@ -46,7 +46,7 @@ function wait_pods() {
     local i output
     for i in {1..30}; do
         output=$(kubectl get pods --no-headers -o wide ${@:--n $NAMESPACE} | grep -vw Completed || echo 'Fail')
-        grep -vE '([0-9]+)/\1 +Running' <<< $output || break
+        grep -vE '([0-9]+)/\1 +Running' <<< "$output" || break
         [ $i -ne 30 ] && sleep 15 || { echo "Godot: pods not running"; false; }
     done
 }
@@ -57,7 +57,7 @@ function wait_nodes() {
     local i output
     for i in {1..20}; do
         output=$(kubectl get nodes --no-headers ${@:-} || echo 'Fail')
-        grep -vE '\bReady\b' <<< $output || break
+        grep -vE '\bReady\b' <<< "$output" || break
         [ $i -ne 20 ] && sleep 30 || { echo "Godot: nodes not running"; false; }
     done
 }
@@ -65,7 +65,7 @@ function wait_nodes() {
 # Wait for Ready condition by default, could be overridden with --for=condition=...
 function wait_for    () { kubectl wait --timeout=5m --for=condition=Ready "$@"; }
 # Wait for terminating pods after rollout
-function wait_rollout() { kubectl rollout status --timeout=5m -n $NAMESPACE "$@"; wait_pods; }
+function wait_rollout() { kubectl rollout status --timeout=5m -n "$NAMESPACE" "$@"; wait_pods; }
 
 # Wait for cluster to come up after reboot
 function wait_cluster() {
@@ -109,7 +109,7 @@ is_version() {
 }
 
 # Query against installed kubewarden app version
-kw_version() { is_version "$1" "$(helm ls -n $NAMESPACE -f kubewarden-crds -o json | jq -r '.[0].app_version')"; }
+kw_version() { is_version "$1" "$(helm ls -n "$NAMESPACE" -f kubewarden-crds -o json | jq -r '.[0].app_version')"; }
 
 # ==================================================================================================
 # Others
@@ -119,7 +119,7 @@ function generate_certs {
     local path=${1:-}
     local fqdn=${2:-cert.kubewarden.io}
 
-    mkdir -p $path && cd $path
+    mkdir -p "$path" && cd "$path"
     # Create CA
     openssl req -nodes -batch -x509 -sha256 -days 365 -newkey rsa:2048 -keyout rootCA.key -out rootCA.crt
     # Create CSR

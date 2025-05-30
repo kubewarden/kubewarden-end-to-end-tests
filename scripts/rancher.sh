@@ -27,12 +27,12 @@ RANCHER=${RANCHER:-}
 EXCLUDE_PATTERN="hotfix|debug|patch"
 
 # Directory of the current script
-SCRIPT_DIR="$(dirname "$0")"
+BASEDIR=$(dirname "${BASH_SOURCE[0]}")
 
 # ==================================================================================================
 # Helper functions
 
-. "$SCRIPT_DIR/../helpers/kubelib.sh"
+. "$BASEDIR/../helpers/kubelib.sh"
 
 create_k3d_cluster() {
     local rancher="$1"
@@ -44,7 +44,7 @@ create_k3d_cluster() {
         2.10*) k8s="v1.31" ;; # v1.28 - v1.31
         2.11*) k8s="v1.32" ;; # v1.30 - v1.32
     esac
-    K3S="${K3S:-$k8s}" "$SCRIPT_DIR"/cluster_k3d.sh create "${@:2}"
+    K3S="${K3S:-$k8s}" "$BASEDIR"/cluster_k3d.sh create "${@:2}"
 }
 
 # Add rancher repositories
