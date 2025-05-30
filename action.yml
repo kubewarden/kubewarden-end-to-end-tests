@@ -1,0 +1,23 @@
+name: "Run Makefile Target"
+description: "Triggers Makefile target in kubewarden-end-to-end-tests repository"
+
+inputs:
+  make:
+    description: "The Makefile target to run"
+    required: true
+    default: "check"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout kubewarden-end-to-end-tests
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.repository_owner }}/kubewarden-end-to-end-tests
+        ref: main
+        path: action-make
+
+    - name: Execute Makefile target
+      run: make ${{ inputs.make }}
+      working-directory: action-make
+      shell: bash
