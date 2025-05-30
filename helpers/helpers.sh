@@ -141,7 +141,7 @@ function wait_policyserver {
     local name="${1:-default}"
     # Wait for specific revision to prevent changes during rollout
     revision=$(kubectl -n $NAMESPACE get "deployment/policy-server-$name" -o json | jq -er '.metadata.annotations."deployment.kubernetes.io/revision"')
-    wait_rollout -n $NAMESPACE --revision $revision "deployment/policy-server-$name"
+    wait_rollout --revision $revision "deployment/policy-server-$name"
     # Wait for final rollout?
-    wait_rollout -n $NAMESPACE "deployment/policy-server-$name"
+    wait_rollout "deployment/policy-server-$name"
 }

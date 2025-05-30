@@ -41,7 +41,7 @@ teardown_file() {
         --cert=$certdir/domain.crt --key=$certdir/domain.key
 
     kubectl apply -f $RESOURCES_DIR/private-registry-deploy.yaml
-    wait_rollout 'deploy/registry'
+    kubectl rollout status --timeout=5m 'deploy/registry'
 }
 
 @test "$(tfile) Pull & Push policy to registry" {

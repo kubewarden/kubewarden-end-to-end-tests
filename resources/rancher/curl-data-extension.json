@@ -1,0 +1,9 @@
+{
+    "charts": [
+      {
+        "chartName": "kubewarden",
+        "releaseName": "kubewarden"
+      }
+    ],
+    "namespace": "cattle-ui-plugin-system"
+  }

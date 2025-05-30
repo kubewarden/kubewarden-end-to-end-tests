@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 set -aeEuo pipefail
-# trap 'echo "Error on ${BASH_SOURCE/$PWD/.}:${LINENO} $(sed -n "${LINENO} s/^\s*//p" $PWD/${BASH_SOURCE/$PWD})"' ERR
+trap 'echo "Error on ${BASH_SOURCE/$PWD/.}:${LINENO} $(sed -n "${LINENO} s/^\s*//p" $PWD/${BASH_SOURCE/$PWD})"' ERR
 
 . "$(dirname "$0")/../helpers/kubelib.sh"
 
 # ==================================================================================================
 # Global variables & Checks - Used only in install & upgrade actions
+
+# Find if Rancher is installed
+RANCHER=${RANCHER:-$(helm status -n cattle-system rancher &>/dev/null && echo 1 || echo "")}
 
 NAMESPACE=${NAMESPACE:-kubewarden}
 # Kubewarden helm repository
@@ -144,8 +147,71 @@ do_install() {
     if [ "${1:-defaults}" = 'defaults' ]; then
         # Initial deployment of policy-server-default is created by controller with delay
         retry "kubectl get -n $NAMESPACE deployment/policy-server-default" 5
-        wait_rollout -n $NAMESPACE deployment/policy-server-default
+        wait_rollout deployment/policy-server-default
     fi
+
+    return 0
+}
+
+# Install on Rancher
+do_install_on_rancher() {
+    echo "Install $VERSION: ${vMap[*]}"
+
+    local datadir rancher token
+    datadir=$(dirname "$0")/../resources/rancher
+    rancher_url=https://$(helm get values -n cattle-system rancher -o json | jq -re '.hostname')
+    rancher_token=$(curl -k --fail-with-body --no-progress-meter --json '{"username":"admin","password":"sa"}' "$rancher_url/v3-public/localProviders/local?action=login" | jq -re '.token')
+
+    appinstall() {
+        local json="$1"
+        local repo="$2"
+        local helmop
+        # Trigger helm operation to install app from repository
+        helmop=$(curl -k --fail-with-body --no-progress-meter -u "$rancher_token" -X POST --json "$json" "$rancher_url/v1/catalog.cattle.io.clusterrepos/${repo}?action=install" | jq -re '.operationName')
+        retry "kubectl get pod -n cattle-system $helmop | grep -qEw 'Completed|Error'" 20 6
+        kubectl logs -n cattle-system "$helmop" -c helm | tee /dev/tty | grep -qE "^SUCCESS: helm.*/kubewarden-"
+    }
+
+    # Merge values from static json and --set parameters
+    merge_values() {
+        local result key value
+        result=$(cat)
+        for param in $(grep -oE -- '--set [^=]+=[^[:space:]]+' <<<"$*" ||:); do
+            [[ $param == --set ]] && continue
+
+            # Convert helm key (a.b.c) to jsonpath ["charts", 0, "values", "a", "b", "c"]
+            key=${param%%=*}
+            key=$(jq -n --arg k "$key" '["charts", 0, "values"] + ($k | split("."))')
+            # Escape string value for jq
+            value=${param#*=}
+            [[ $value =~ ^(true|false|[0-9]+(\.[0-9]+)?)$ ]] || value=$(jq -n --arg v "$value" '$v')
+
+            # Update the value in the result json
+            result=$(jq -c --argjson k "$key" --argjson v "$value" 'setpath($k; $v)' <<<"$result")
+        done
+        echo "$result"
+    }
+
+    # Add repositories
+    for i in kubewarden-extension-github kubewarden-charts; do
+        kubectl get clusterrepos "$i" &>/dev/null || kubectl apply -f "$datadir/repo-$i.yaml"
+        retry "kubectl get clusterrepos $i -o json | jq -e '.status.downloadTime' > /dev/null" 5 3
+    done
+
+    # Install UI extension
+    appinstall "@$datadir/curl-data-extension.json" "kubewarden-extension-github"
+
+    # Install Kubewarden charts
+    local argsvar
+    for chart in ${1:-crds controller defaults}; do
+        argsvar=${chart^^}_ARGS
+        # Update app version in json and install
+        jq -ce --arg v "${vMap[$chart]}" '.charts[0].version = $v' "$datadir/curl-data-$chart.json" \
+            | merge_values "${!argsvar}" "${@:2}" \
+            | appinstall @- "kubewarden-charts"
+        [ "$chart" == 'controller' ] && wait_rollout deployment/rancher-kubewarden-controller
+        [ "$chart" == 'defaults' ] && wait_rollout deployment/policy-server-default
+    done
 
     return 0
 }
@@ -165,10 +231,10 @@ do_upgrade() {
             [[ "${vMap[$chart]}" == 4.1* ]] && continue # Url renamed to Module in PS ConfigMap
             [[ "${vMap[$chart]}" == 5.0* ]] && continue # Probe port change from https to http
             sleep 20 # Wait for reconciliation
-            wait_rollout -n $NAMESPACE deployment/policy-server-default
+            wait_rollout deployment/policy-server-default
         fi
     done
-    [ "${1:-defaults}" == 'defaults' ] && wait_rollout -n $NAMESPACE deployment/policy-server-default
+    [ "${1:-defaults}" == 'defaults' ] && wait_rollout deployment/policy-server-default
 
     return 0
 }
@@ -188,7 +254,7 @@ do_set() {
     helm_up kubewarden-$chart --version "$ver" --reuse-values "${@:2}"
 
     [[ "$1" == 'controller' ]] && sleep 20 # Wait for reconciliation
-    [[ "$1" =~ (controller|defaults) ]] && wait_rollout -n $NAMESPACE deployment/policy-server-default
+    [[ "$1" =~ (controller|defaults) ]] && wait_rollout deployment/policy-server-default
     return 0
 }
 
@@ -200,7 +266,7 @@ do_reset() {
     helm_up kubewarden-$chart --version "$ver" --reset-values ${!argsvar} "${@:2}"
 
     # Wait for pods to be ready
-    [ "$1" = 'defaults' ] && wait_rollout -n $NAMESPACE deployment/policy-server-default
+    [ "$1" = 'defaults' ] && wait_rollout deployment/policy-server-default
     return 0
 }
 

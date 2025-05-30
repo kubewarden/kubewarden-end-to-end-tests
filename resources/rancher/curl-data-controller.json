@@ -1,0 +1,22 @@
+{
+  "charts": [
+    {
+      "chartName": "kubewarden-controller",
+      "releaseName": "rancher-kubewarden-controller",
+      "annotations": {
+        "catalog.cattle.io/ui-source-repo-type": "cluster",
+        "catalog.cattle.io/ui-source-repo": "kubewarden-charts"
+      },
+      "values": {
+        "global": {
+          "priorityClassName": "",
+          "systemDefaultRegistry": "ghcr.io"
+        },
+        "auditScanner" : {
+          "policyReporter": true
+        }
+      }
+    }
+  ],
+  "namespace": "cattle-kubewarden-system"
+}

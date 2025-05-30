@@ -4,8 +4,10 @@ MKFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 TESTS_DIR := $(MKFILE_DIR)tests
 RESOURCES_DIR := $(MKFILE_DIR)resources
 
-NAMESPACE ?= kubewarden
+NAMESPACE ?= $(shell helm status -n cattle-system rancher &>/dev/null && echo "cattle-kubewarden-system" || echo "kubewarden")
 CLUSTER_CONTEXT ?= $(shell kubectl config current-context)
+
+export NAMESPACE
 
 # ==================================================================================================
 # Optional arguments for scripts
@@ -68,7 +70,6 @@ BATS_SELECTED := $(or $(BATS_SELECTED),$(FILTERED))
 .run_bats:
 	@echo "Running BATS tests: $(BATS_SELECTED)"
 	@RESOURCES_DIR="$(RESOURCES_DIR)" \
-	NAMESPACE="$(NAMESPACE)" \
 	CLUSTER_CONTEXT="$(CLUSTER_CONTEXT)" \
 	bats -T --print-output-on-failure $(addprefix $(TESTS_DIR)/, $(BATS_SELECTED))
 

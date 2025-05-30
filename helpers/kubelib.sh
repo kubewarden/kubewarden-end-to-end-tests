@@ -45,7 +45,7 @@ function retry() {
 function wait_pods() {
     local i output
     for i in {1..30}; do
-        output=$(kubectl get pods --no-headers -o wide ${@:--n kubewarden} | grep -vw Completed || echo 'Fail')
+        output=$(kubectl get pods --no-headers -o wide ${@:--n $NAMESPACE} | grep -vw Completed || echo 'Fail')
         grep -vE '([0-9]+)/\1 +Running' <<< $output || break
         [ $i -ne 30 ] && sleep 15 || { echo "Godot: pods not running"; false; }
     done
@@ -65,7 +65,7 @@ function wait_nodes() {
 # Wait for Ready condition by default, could be overridden with --for=condition=...
 function wait_for    () { kubectl wait --timeout=5m --for=condition=Ready "$@"; }
 # Wait for terminating pods after rollout
-function wait_rollout() { kubectl rollout status --timeout=5m "$@"; wait_pods; }
+function wait_rollout() { kubectl rollout status --timeout=5m -n $NAMESPACE "$@"; wait_pods; }
 
 # Wait for cluster to come up after reboot
 function wait_cluster() {
