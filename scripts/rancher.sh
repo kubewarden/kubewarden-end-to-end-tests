@@ -107,6 +107,8 @@ wait_for_rancher() {
 # ==================================================================================================
 # Main script
 
+precheck rancher || exit 1
+
 helm_add_repositories
 
 # Find CHART_REPO & CHART_VER based on RANCHER

@@ -148,3 +148,36 @@ function kuberun {
     kubectl run "pod-$(date +%s)" --image=busybox --restart=Never --rm -it -q --command "$@"
 }
 export -f kuberun
+
+# Check before running a command
+precheck() {
+    local cmd="$1"
+    case "$cmd" in
+        cluster)
+            if kubectl cluster-info &>/dev/null; then
+                echo "Cluster already exists!"
+                echo "Kubernetes: $(kubectl version -o json | jq -r '.serverVersion.gitVersion')"
+                return 1
+            fi
+        ;;
+        rancher)
+            # Fail if Rancher is already installed
+            if helm status -n cattle-system rancher &>/dev/null; then
+                echo "Rancher already exists!"
+                RANCHER_FQDN=$(helm get values -n cattle-system rancher -o json | jq -re '.hostname')
+                echo "Rancher URL: https://$RANCHER_FQDN/"
+                return 1
+            fi
+        ;;&
+        kubewarden|rancher)
+            # Fail if Kubewarden is already installed
+            if kubectl get cap &>/dev/null; then
+                echo "Kubewarden already exists!"
+                helm ls -n $NAMESPACE -o json | jq -r '"Kubewarden: \(.[0].app_version)", (.[].chart | " - " + .)'
+                return 1
+            fi
+        ;;
+        *) error "Unknown command: $cmd"; exit 1 ;;
+    esac
+    return 0
+}
