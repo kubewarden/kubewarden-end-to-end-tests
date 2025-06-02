@@ -7,6 +7,7 @@
 |--------------------	|-----------------	|-----	|----------------------	| :--------: |
 | nightly (schedule) 	| latest tag      	| k3d 	|                      	| [![E2E](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-tests.yml/badge.svg?event=schedule)](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-tests.yml?query=event%3Aschedule) |
 |                    	| source (main)   	| k3d 	| :latest images       	|  |
+| airgap (every Friday)| latest tag       | k3s   |                       | [![Airgap E2E Tests](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-airgap.yml/badge.svg?event=schedule)](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-airgap.yml?query=event%3Aschedule) |
 | release (tag)      	| release tag     	| k3d 	|                      	| [![E2E](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-tests.yml/badge.svg?event=workflow_run)](https://github.com/kubewarden/helm-charts/actions/workflows/e2e-tests.yml?query=event%3Aworkflow_run) |
 |                    	| previous stable 	| k3d 	| upgrade to released  	|  |
 |                    	| release tag     	| old 	| oldest supported k8s 	|  |
