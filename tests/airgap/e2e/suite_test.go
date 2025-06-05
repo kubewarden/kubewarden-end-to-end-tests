@@ -38,9 +38,12 @@ const (
 )
 
 var (
-	k3sVersion         string
-	netDefaultFileName string
-	rancherHostname    string
+	auditScannerVersion         string
+	kubewardenControllerVersion string
+	policyServerVersion         string
+	k3sVersion                  string
+	netDefaultFileName          string
+	rancherHostname             string
 )
 
 /*
@@ -77,6 +80,9 @@ func TestE2E(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	auditScannerVersion = os.Getenv("AUDIT_SCANNER_VERSION")
+	kubewardenControllerVersion = os.Getenv("KUBEWARDEN_CONTROLLER_VERSION")
+	policyServerVersion = os.Getenv("POLICY_SERVER_VERSION")
 	k3sVersion = os.Getenv("K3S_VERSION")
 	netDefaultFileName = "../assets/net-default-airgap.xml"
 	rancherHostname = os.Getenv("PUBLIC_FQDN")
