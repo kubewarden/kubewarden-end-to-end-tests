@@ -1,8 +1,7 @@
 #!/usr/bin/env bats
 
 setup() {
-    load ../helpers/helpers.sh
-    wait_pods -n kube-system
+    setup_helper
 }
 
 # Hardcode PolicyReports to v1alpha2 from clusterpolicyreports.wgpolicyk8s.io and not clusterpolicyreports.x-k8s.io
@@ -50,6 +49,7 @@ function assert_cronjob {
     assert_cronjob false
 }
 
+# bats test_tags=setup:--no-wait
 @test "[Audit Scanner Installation] Install with CRDs pre-installed" {
     # Install kubewarden with custom policyreport-crds
     kubectl create -f $CRD_BASE/wgpolicyk8s.io_policyreports.yaml
@@ -75,6 +75,7 @@ function assert_cronjob {
     assert_crds false
 }
 
+# bats test_tags=setup:--no-wait
 @test "[Audit Scanner Installation] Install with CRDs from Kubewarden Helm charts" {
     helmer reinstall
     assert_crds true

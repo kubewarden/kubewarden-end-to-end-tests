@@ -1,14 +1,10 @@
 #!/usr/bin/env bats
 
 setup() {
-    load ../helpers/helpers.sh
-    wait_pods
+    setup_helper
 }
-
 teardown_file() {
-    load ../helpers/helpers.sh
-    kubectl delete pods --all
-    kubectl delete admissionpolicies,clusteradmissionpolicies --all -A
+    teardown_helper
 }
 
 @test "[Monitor mode end-to-end tests] Install ClusterAdmissionPolicy in monitor mode" {

@@ -2,8 +2,7 @@
 # https://github.com/kubewarden/kubewarden-controller/pull/421
 
 setup() {
-    load ../helpers/helpers.sh
-    wait_pods
+    setup_helper
 
     # FQDN=$(k3d node get k3d-$CLUSTER_NAME-server-0 -o json | jq -r 'first.IP.IP').nip.io
     FQDN=$(kubectl get nodes -l 'node-role.kubernetes.io/control-plane' -o custom-columns=INTERNAL-IP:.status.addresses[0].address --no-headers | tail -1).nip.io
@@ -14,8 +13,7 @@ setup() {
 }
 
 teardown_file() {
-    load ../helpers/helpers.sh
-    kubectl delete admissionpolicies,clusteradmissionpolicies --all -A
+    teardown_helper
 
     helmer set kubewarden-defaults \
         --set policyServer.imagePullSecret=null \

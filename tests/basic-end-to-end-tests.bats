@@ -1,14 +1,10 @@
 #!/usr/bin/env bats
 
 setup() {
-    load ../helpers/helpers.sh
-    wait_pods
+    setup_helper
 }
-
 teardown_file() {
-    load ../helpers/helpers.sh
-    kubectl delete pods --all
-    kubectl delete ap,cap,capg --all -A
+    teardown_helper
 }
 
 @test "[Basic end-to-end tests] Helm app version is consistent" {

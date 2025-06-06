@@ -5,14 +5,11 @@
 # kubectl port-forward -n jaeger svc/my-open-telemetry-query 16686:16686
 
 setup() {
-    load ../helpers/helpers.sh
-    wait_pods -n kube-system
+    setup_helper
 }
 
 teardown_file() {
-    load ../helpers/helpers.sh
-    kubectl delete admissionpolicies,clusteradmissionpolicies --all -A
-    kubectl delete pod nginx-privileged nginx-unprivileged --ignore-not-found
+    teardown_helper
 
     # Remote otel collector cleanup
     kubectl delete --ignore-not-found -f $RESOURCES_DIR/opentelemetry-jaeger.yaml

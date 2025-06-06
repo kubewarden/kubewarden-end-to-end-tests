@@ -1,14 +1,10 @@
 #!/usr/bin/env bats
 
 setup() {
-    load ../helpers/helpers.sh
-    wait_pods -n kube-system
+    setup_helper
 }
-
 teardown_file() {
-    load ../helpers/helpers.sh
-    kubectl delete pods --all
-    kubectl delete admissionpolicies,clusteradmissionpolicies --all -A
+    teardown_helper
     kubectl delete ns testing-audit-scanner --ignore-not-found
 }
 
