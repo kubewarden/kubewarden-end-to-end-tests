@@ -116,9 +116,9 @@ cd ${OPT_RANCHER}/images/
 
 # Add helm charts to hauler store
 cd ${OPT_RANCHER}
-${HAULER_BIN} store add chart ./helm/kubewarden-crds* --repo .
-${HAULER_BIN} store add chart ./helm/kubewarden-controller* --repo .
-${HAULER_BIN} store add chart ./helm/kubewarden-defaults* --repo .
+${HAULER_BIN} store add chart ./helm/kubewarden-crds-* --repo .
+${HAULER_BIN} store add chart ./helm/kubewarden-controller-* --repo .
+${HAULER_BIN} store add chart ./helm/kubewarden-defaults-* --repo .
 
 # Add images to hauler store
 for i in $(<${OPT_RANCHER}/helm/kubewarden-controller/imagelist.txt) \
