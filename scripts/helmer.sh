@@ -135,6 +135,14 @@ make_version_map() {
     print_env > /tmp/helmer.env
 }
 
+print_version_map() {
+    local out
+    for k in app crds controller defaults; do
+        out+="$k:${vMap[$k]} "
+    done
+    echo -n "${out% }" # Remove trailing space
+}
+
 # ==================================================================================================
 # Install & Upgrade kubewarden (change chart version)
 
@@ -166,7 +174,7 @@ setup_requirements() {
 
 # Install selected $VERSION
 do_install() {
-    echo "Install $VERSION: ${vMap[*]}"
+    echo "Install $VERSION: ($(print_version_map))"
 
     local argsvar
     for chart in ${1:-crds controller defaults}; do
@@ -186,7 +194,7 @@ do_install() {
 
 # Install on Rancher
 do_install_on_rancher() {
-    echo "Install $VERSION: ${vMap[*]}"
+    echo "Install $VERSION: ($(print_version_map))"
 
     local datadir rancher_url rancher_token
     datadir=$BASEDIR/../resources/rancher
@@ -249,7 +257,7 @@ do_install_on_rancher() {
 
 # Upgrade version and restore current values (helm recommends)
 do_upgrade() {
-    echo "Upgrade to $VERSION: ${vMap[*]}"
+    echo "Upgrade to $VERSION:($(print_version_map))"
 
     local argsvar
     for chart in ${1:-crds controller defaults}; do
