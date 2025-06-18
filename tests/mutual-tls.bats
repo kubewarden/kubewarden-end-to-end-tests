@@ -51,8 +51,8 @@ function check_service_mtls {
 
     # Check what services require certificates
     check_service_mtls https://kubewarden-controller-webhook-service.kubewarden.svc:443/validate-policies-kubewarden-io-v1-policyserver
-    check_service_mtls https://policy-server-default.kubewarden.svc:8443/validate
-    check_service_mtls https://policy-server-mtls-pserver.kubewarden.svc:8443/validate
+    check_service_mtls https://policy-server-default.kubewarden.svc:443/validate
+    check_service_mtls https://policy-server-mtls-pserver.kubewarden.svc:443/validate
 
     # Check protected policy still blocks requests
     apply_policy safe-labels-pods-policy.yaml
@@ -64,8 +64,8 @@ function check_service_mtls {
 
     # Talk to services without a certificate
     curlpod https://kubewarden-controller-webhook-service.kubewarden.svc:443/validate-policies-kubewarden-io-v1-policyserver
-    curlpod https://policy-server-default.kubewarden.svc:8443/validate
-    curlpod https://policy-server-mtls-pserver.kubewarden.svc:8443/validate
+    curlpod https://policy-server-default.kubewarden.svc:443/validate
+    curlpod https://policy-server-mtls-pserver.kubewarden.svc:443/validate
 
     # Check mTLS is disabled in on policy server log (grep -vz negates search)
     kubectl logs -n kubewarden -l kubewarden/policy-server=default | grep -vzE "certs: Loaded client CA certificates client_ca_certs_added=[1-9]"
