@@ -135,7 +135,8 @@ helm install rancher "$CHART_REPO" --version "$CHART_VER" \
     --set bootstrapPassword=sa \
     --wait --timeout=10m \
     --set replicas=1 \
-    ${stgregistry:+--set rancherImage=stgregistry.suse.com/rancher/rancher} && wait_for_rancher
+    ${stgregistry:+--set rancherImage=stgregistry.suse.com/rancher/rancher}
+wait_for_rancher
 
 # Check if Rancher has correct version and print URL
 helm get metadata rancher -n cattle-system -o json | jq -r '.version' | grep -qx "$CHART_VER"
