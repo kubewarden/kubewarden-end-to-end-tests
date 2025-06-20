@@ -27,7 +27,7 @@ teardown_file() {
 }
 
 # https://medium.com/geekculture/deploying-docker-registry-on-kubernetes-3319622b8f32
-@test "[Private Registry] Generate AUTH and start registry" {
+@test "$(tfile) Generate AUTH and start registry" {
     certdir="$BATS_RUN_TMPDIR/certs/"
     generate_certs "$certdir" "$FQDN"
 
@@ -44,7 +44,7 @@ teardown_file() {
     wait_rollout 'deploy/registry'
 }
 
-@test "[Private Registry] Pull & Push policy to registry" {
+@test "$(tfile) Pull & Push policy to registry" {
     jq -n --arg r $REGISTRY \
         '{"auths": {($r): {"auth": "dGVzdHVzZXI6dGVzdHBhc3N3b3Jk"}}}' > "$BATS_RUN_TMPDIR/config.json"
     jq -n --arg r $REGISTRY --arg crt "$BATS_RUN_TMPDIR/certs/rootCA.crt" \
@@ -57,7 +57,7 @@ teardown_file() {
 }
 
 # https://docs.kubewarden.io/operator-manual/policy-servers/private-registry
-@test "[Private Registry] Set up policy server access to registry" {
+@test "$(tfile) Set up policy server access to registry" {
     # Create secret to access registry
     kubectl --namespace kubewarden create secret docker-registry secret-registry-docker \
       --docker-username=testuser \
@@ -73,7 +73,7 @@ teardown_file() {
     helm get values -n $NAMESPACE kubewarden-defaults
 }
 
-@test "[Private Registry] Check I can deploy policy from auth registry" {
+@test "$(tfile) Check I can deploy policy from auth registry" {
     policy="$BATS_RUN_TMPDIR/private-policy.yaml"
 
     kwctl scaffold manifest --type=ClusterAdmissionPolicy $PUB_POLICY |\

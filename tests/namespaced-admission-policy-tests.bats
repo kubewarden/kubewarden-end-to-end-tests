@@ -7,7 +7,7 @@ teardown_file() {
     teardown_helper
 }
 
-@test "[Namespaced AdmissionPolicy] Test AdmissionPolicy in default NS" {
+@test "$(tfile) Test AdmissionPolicy in default NS" {
     apply_policy policy-pod-privileged.yaml
 
     # Privileged pod in the default namespace (should fail)
@@ -24,7 +24,7 @@ teardown_file() {
     kubectl delete pod nginx-unprivileged
 }
 
-@test  "[Namespaced AdmissionPolicy] Update policy to check only UPDATE operations" {
+@test  "$(tfile) Update policy to check only UPDATE operations" {
     yq '.spec.rules[0].operations = ["UPDATE"]' $RESOURCES_DIR/policies/policy-pod-privileged.yaml | kubectl apply -f -
 
     # I can create privileged pods now
@@ -35,7 +35,7 @@ teardown_file() {
     kubectl delete pod nginx-privileged
 }
 
-@test "[Namespaced AdmissionPolicy] Delete AdmissionPolicy to check restrictions are removed" {
+@test "$(tfile) Delete AdmissionPolicy to check restrictions are removed" {
     delete_policy policy-pod-privileged.yaml
 
     # I can create privileged pods

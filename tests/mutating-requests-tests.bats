@@ -8,7 +8,7 @@ teardown_file() {
 }
 
 # Same as in basic e2e tests?
-@test "[Mutation request tests] Test psp-user-group policy with mutating flag enabled" {
+@test "$(tfile) Test psp-user-group policy with mutating flag enabled" {
     apply_policy mutate-policy-with-flag-enabled.yaml
 
     # New pod should be mutated by the policy
@@ -20,7 +20,7 @@ teardown_file() {
     delete_policy mutate-policy-with-flag-enabled.yaml
 }
 
-@test "[Mutation request tests] Test psp-user-group policy with mutating flag disabled" {
+@test "$(tfile) Test psp-user-group policy with mutating flag disabled" {
     apply_policy mutate-policy-with-flag-disabled.yaml
 
     # New pod should be rejected by psp-user-group-policy

@@ -36,7 +36,7 @@ function get_metrics {
 }
 export -f get_metrics # required by retry command
 
-@test "[OpenTelemetry] Install OpenTelemetry, Prometheus, Jaeger" {
+@test "$(tfile) Install OpenTelemetry, Prometheus, Jaeger" {
     # Required by OpenTelemetry
     helm repo add e2e-jetstack https://charts.jetstack.io --force-update
     helm upgrade -i --wait cert-manager e2e-jetstack/cert-manager \
@@ -73,7 +73,7 @@ export -f get_metrics # required by retry command
     helmer set kubewarden-defaults --set recommendedPolicies.enabled=True
 }
 
-@test "[OpenTelemetry] Kubewarden containers have sidecars & metrics" {
+@test "$(tfile) Kubewarden containers have sidecars & metrics" {
     # Controller is restarted to get sidecar
     wait_pods -n $NAMESPACE
 
@@ -94,7 +94,7 @@ export -f get_metrics # required by retry command
     retry 'test $(get_metrics kubewarden-controller-metrics-service | wc -l) -gt 1'
 }
 
-@test "[OpenTelemetry] Audit scanner runs should generate metrics" {
+@test "$(tfile) Audit scanner runs should generate metrics" {
     kubectl get cronjob -n $NAMESPACE audit-scanner
 
     # Launch unprivileged & privileged pods
@@ -114,7 +114,7 @@ export -f get_metrics # required by retry command
     delete_policy namespace-label-propagator-policy.yaml
 }
 
-@test "[OpenTelemetry] Disabling telemetry should remove sidecars & metrics" {
+@test "$(tfile) Disabling telemetry should remove sidecars & metrics" {
     helmer set kubewarden-controller \
         --set telemetry.metrics=False \
         --set telemetry.tracing=False

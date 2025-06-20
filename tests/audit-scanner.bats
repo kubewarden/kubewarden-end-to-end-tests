@@ -50,7 +50,7 @@ check_report_result() {
     fi
 }
 
-@test "[Audit Scanner] Install testing policies and resources" {
+@test "$(tfile) Install testing policies and resources" {
     # Make sure cronjob was created
     kubectl get cronjob -n $NAMESPACE audit-scanner
 
@@ -75,7 +75,7 @@ check_report_result() {
     trigger_audit_scan
 }
 
-@test "[Audit Scanner] Check cluster wide report results" {
+@test "$(tfile) Check cluster wide report results" {
     local r
 
     # Custom namespace should have failed the audit
@@ -102,7 +102,7 @@ check_report_result() {
     check_report_result "$r" pass clusterwide-safe-labels-for-pods
 }
 
-@test "[Audit Scanner] Delete some policies and retrigger audit scan" {
+@test "$(tfile) Delete some policies and retrigger audit scan" {
     delete_policy safe-labels-pods-policy.yaml
     delete_policy namespace-psa-label-enforcer-policy.yaml
     wait_policyserver
@@ -110,7 +110,7 @@ check_report_result() {
     trigger_audit_scan
 }
 
-@test "[Audit Scanner] Deleted ClusterAdmission policies are removed from audit results" {
+@test "$(tfile) Deleted ClusterAdmission policies are removed from audit results" {
     local r
 
     # Custom namespace pass removed
@@ -137,7 +137,7 @@ check_report_result() {
     check_report_result "$r" null clusterwide-safe-labels-for-pods
 }
 
-@test "[Audit Scanner] Delete all policy reports after all relevant policies" {
+@test "$(tfile) Delete all policy reports after all relevant policies" {
     delete_policy privileged-pod-policy.yaml
     delete_policy safe-labels-namespace.yaml
     wait_policyserver

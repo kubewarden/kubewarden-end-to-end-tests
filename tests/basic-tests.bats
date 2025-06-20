@@ -7,12 +7,12 @@ teardown_file() {
     teardown_helper
 }
 
-@test "[Basic end-to-end tests] Helm app version is consistent" {
+@test "$(tfile) Helm app version is consistent" {
     helm list -n $NAMESPACE -o json | jq 'map(.app_version) | unique | length == 1'
 }
 
 # Create pod-privileged policy to block CREATE & UPDATE of privileged pods
-@test "[Basic end-to-end tests] Apply pod-privileged policy that blocks CREATE & UPDATE" {
+@test "$(tfile) Apply pod-privileged policy that blocks CREATE & UPDATE" {
     apply_policy privileged-pod-policy.yaml
 
     # Launch unprivileged pod
@@ -24,7 +24,7 @@ teardown_file() {
 }
 
 # Update pod-privileged policy to block only UPDATE of privileged pods
-@test "[Basic end-to-end tests] Patch policy to block only UPDATE operation" {
+@test "$(tfile) Patch policy to block only UPDATE operation" {
     yq '.spec.rules[0].operations = ["UPDATE"]' $RESOURCES_DIR/policies/privileged-pod-policy.yaml | kubectl apply -f -
 
     # I can create privileged pods now
@@ -34,14 +34,14 @@ teardown_file() {
     kubefail_privileged label pod nginx-privileged x=y
 }
 
-@test "[Basic end-to-end tests] Delete ClusterAdmissionPolicy" {
+@test "$(tfile) Delete ClusterAdmissionPolicy" {
     delete_policy privileged-pod-policy.yaml
 
     # I can update privileged pods now
     kubectl label pod nginx-privileged x=y
 }
 
-@test "[Basic end-to-end tests] Apply mutating psp-user-group AdmissionPolicy" {
+@test "$(tfile) Apply mutating psp-user-group AdmissionPolicy" {
     apply_policy psp-user-group-policy.yaml
 
     # Policy should mutate pods
@@ -52,7 +52,7 @@ teardown_file() {
     delete_policy psp-user-group-policy.yaml
 }
 
-@test "[Basic end-to-end tests] Launch & scale second policy server" {
+@test "$(tfile) Launch & scale second policy server" {
     create_policyserver e2e-tests
     wait_for policyserver e2e-tests --for=condition=ServiceReconciled
 
