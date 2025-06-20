@@ -122,7 +122,7 @@ fi
 # Get the FQDN for Rancher
 RANCHER_FQDN=${RANCHER_FQDN:-$(kubectl get svc traefik -n kube-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}').nip.io}
 # Required for prime Alpha & RC
-[[ $CHART_REPO =~ ^rancher-prime(alpha|rc) ]] && stgregistry=1
+[[ $CHART_REPO =~ ^e2e-rancher-prime(alpha|rc) ]] && stgregistry=1
 
 # Install cert-manager
 helm install --wait cert-manager e2e-jetstack/cert-manager -n cert-manager --create-namespace --set crds.enabled=true
@@ -135,7 +135,9 @@ helm install rancher "$CHART_REPO" --version "$CHART_VER" \
     --set bootstrapPassword=sa \
     --wait --timeout=10m \
     --set replicas=1 \
-    ${stgregistry:+--set rancherImage=stgregistry.suse.com/rancher/rancher}
+    ${stgregistry:+--set rancherImage=stgregistry.suse.com/rancher/rancher} \
+    ${stgregistry:+--set extraEnv[0].name=CATTLE_AGENT_IMAGE} \
+    ${stgregistry:+--set extraEnv[0].value=stgregistry.suse.com/rancher/rancher-agent:v$CHART_VER}
 wait_for_rancher
 
 # Check if Rancher has correct version and print URL
