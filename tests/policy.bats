@@ -12,7 +12,7 @@ teardown_file() {
 # Number of policies included in the recommended policies
 POLICY_NUMBER=6
 
-@test "[Recommended policies] Install policies in protect mode" {
+@test "$(tfile) Install recommended policies in protect mode" {
     helmer set kubewarden-defaults \
         --set recommendedPolicies.enabled=True \
         --set recommendedPolicies.defaultPolicyMode=protect \
@@ -25,7 +25,7 @@ POLICY_NUMBER=6
     kubectl --no-headers=true get ap,cap,apg,capg -A | wc -l | grep -qx $POLICY_NUMBER
 }
 
-@test "[Recommended policies] Check that policies are enforced" {
+@test "$(tfile) Recommended policies are enforced" {
     # Test privileged pod (should fail)
     kubefail_privileged run pod-privileged --image=rancher/pause:3.2 --privileged
 
@@ -54,13 +54,13 @@ POLICY_NUMBER=6
     kuberun --privileged -n shouldbeignored
 }
 
-@test "[Recommended policies] Disable policies & run privileged pod" {
+@test "$(tfile) Disable recommended policies" {
     helmer set kubewarden-defaults --set recommendedPolicies.enabled=False
     kubectl run pod-privileged --image=rancher/pause:3.2 --privileged
     kubectl delete pod pod-privileged
 }
 
-@test "[Rego policy] Apply rego policy to block nginx image usage" {
+@test "$(tfile) Rego policy blocks nginx image usage" {
     apply_policy rego-block-image-policy.yaml
 
     run ! kuberun --image=nginx
@@ -68,7 +68,7 @@ POLICY_NUMBER=6
     delete_policy rego-block-image-policy.yaml
 }
 
-@test "[CEL policies] Apply CEL policy to block deployment with replicas < 3" {
+@test "$(tfile) CEL policy blocks deployment with replicas < 3" {
     apply_policy cel-policy.yaml
 
     # Deployment should fail because replicas < 3
@@ -81,7 +81,7 @@ POLICY_NUMBER=6
     delete_policy cel-policy.yaml
 }
 
-@test "[Policy group] Apply policy group to block privileged escalation and shared pid namespace pods" {
+@test "$(tfile) Group policy blocks privileged escalation and shared pid namespace pods" {
     apply_policy policy-group-escalation-shared-pid.yaml
 
     # I can not create pod using privileged escalation only

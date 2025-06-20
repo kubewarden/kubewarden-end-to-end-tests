@@ -26,7 +26,7 @@ function check_service_mtls {
     assert_output --regexp "error.*alert certificate required"
 }
 
-@test "[Mutual TLS] Prepare resources" {
+@test "$(tfile) Prepare resources" {
     # Create secondary Policy Server
     create_policyserver mtls-pserver
 
@@ -36,14 +36,14 @@ function check_service_mtls {
     kubectl cp resources/mtls curlpod:/mtls
 }
 
-@test "[Mutual TLS] Enable mTLS" {
+@test "$(tfile) Enable mTLS" {
     helm get values -n $NAMESPACE kubewarden-controller -o json | jq -e '.mTLS.enable == true' && skip "mTLS was enabled during installation"
 
     kubectl get cm -n $NAMESPACE mtlscm &>/dev/null || kubectl create cm -n $NAMESPACE mtlscm --from-file="client-ca.crt=$RESOURCES_DIR/mtls/rootCA.crt"
     helmer set kubewarden-controller --set mTLS.enable=true --set mTLS.configMapName=mtlscm
 }
 
-@test "[Mutual TLS] Check mTLS" {
+@test "$(tfile) Check mTLS" {
     # Check mTLS is enabled in kubernetes
     kubectl get nodes -l node-role.kubernetes.io/control-plane -o yaml | grep -F "admission-control-config-file"
     # Check default PS logs
@@ -59,7 +59,7 @@ function check_service_mtls {
     run ! kuberun -l cost-center=lbl
 }
 
-@test "[Mutual TLS] Disable mTLS" {
+@test "$(tfile) Disable mTLS" {
     helmer set kubewarden-controller --set mTLS.enable=false
 
     # Talk to services without a certificate

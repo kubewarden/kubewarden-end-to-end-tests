@@ -8,7 +8,7 @@ teardown_file() {
 }
 
 # Same as in basic e2e tests?
-@test "[Context Aware Policy tests] Test mutating a Pod" {
+@test "$(tfile) Test mutating a Pod" {
     apply_policy context-aware-policy.yaml
 
     # Create Pod with the right annotation
