@@ -20,6 +20,3 @@ prometheus:
       endpoints:
         - port: metrics
           interval: 10s
-  # https://github.com/prometheus-community/helm-charts/issues/5690
-  prometheusSpec:
-    maximumStartupDurationSeconds: 300

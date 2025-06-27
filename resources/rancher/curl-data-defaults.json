@@ -1,0 +1,18 @@
+{
+    "charts": [
+      {
+        "chartName": "kubewarden-defaults",
+        "releaseName": "rancher-kubewarden-defaults",
+        "annotations": {
+          "catalog.cattle.io/ui-source-repo-type": "cluster",
+          "catalog.cattle.io/ui-source-repo": "kubewarden-charts"
+        },
+        "values": {
+          "recommendedPolicies": {
+            "enabled": true
+          }
+        }
+      }
+    ],
+    "namespace": "cattle-kubewarden-system"
+  }

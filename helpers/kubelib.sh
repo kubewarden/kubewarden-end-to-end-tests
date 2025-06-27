@@ -30,7 +30,7 @@ function retry() {
     local i status
 
     for ((i=1; i<=tries; i++)); do
-        timeout $delay bash -c "$cmd" && break || status=$?
+        timeout "$delay" bash -c "$cmd" && break || status=$?
         if [[ $i -lt $tries ]]; then
             echo "RETRY #$i: $cmd"
             [[ $status -ne 124 ]] && sleep $delay
@@ -45,8 +45,8 @@ function retry() {
 function wait_pods() {
     local i output
     for i in {1..30}; do
-        output=$(kubectl get pods --no-headers -o wide ${@:--n kubewarden} | grep -vw Completed || echo 'Fail')
-        grep -vE '([0-9]+)/\1 +Running' <<< $output || break
+        output=$(kubectl get pods --no-headers -o wide ${@:--n $NAMESPACE} | grep -vw Completed || echo 'Fail')
+        grep -vE '([0-9]+)/\1 +Running' <<< "$output" || break
         [ $i -ne 30 ] && sleep 15 || { echo "Godot: pods not running"; false; }
     done
 }
@@ -57,7 +57,7 @@ function wait_nodes() {
     local i output
     for i in {1..20}; do
         output=$(kubectl get nodes --no-headers ${@:-} || echo 'Fail')
-        grep -vE '\bReady\b' <<< $output || break
+        grep -vE '\bReady\b' <<< "$output" || break
         [ $i -ne 20 ] && sleep 30 || { echo "Godot: nodes not running"; false; }
     done
 }
@@ -65,7 +65,7 @@ function wait_nodes() {
 # Wait for Ready condition by default, could be overridden with --for=condition=...
 function wait_for    () { kubectl wait --timeout=5m --for=condition=Ready "$@"; }
 # Wait for terminating pods after rollout
-function wait_rollout() { kubectl rollout status --timeout=5m "$@"; wait_pods; }
+function wait_rollout() { kubectl rollout status --timeout=5m -n "$NAMESPACE" "$@"; wait_pods; }
 
 # Wait for cluster to come up after reboot
 function wait_cluster() {
@@ -109,7 +109,7 @@ is_version() {
 }
 
 # Query against installed kubewarden app version
-kw_version() { is_version "$1" "$(helm ls -n $NAMESPACE -f kubewarden-crds -o json | jq -r '.[0].app_version')"; }
+kw_version() { is_version "$1" "$(helm ls -n "$NAMESPACE" -f kubewarden-crds -o json | jq -r '.[0].app_version')"; }
 
 # ==================================================================================================
 # Others
@@ -119,7 +119,7 @@ function generate_certs {
     local path=${1:-}
     local fqdn=${2:-cert.kubewarden.io}
 
-    mkdir -p $path && cd $path
+    mkdir -p "$path" && cd "$path"
     # Create CA
     openssl req -nodes -batch -x509 -sha256 -days 365 -newkey rsa:2048 -keyout rootCA.key -out rootCA.crt
     # Create CSR
@@ -148,3 +148,36 @@ function kuberun {
     kubectl run "pod-$(date +%s)" --image=busybox --restart=Never --rm -it -q --command "$@"
 }
 export -f kuberun
+
+# Check before running a command
+precheck() {
+    local cmd="$1"
+    case "$cmd" in
+        cluster)
+            if kubectl cluster-info &>/dev/null; then
+                echo "Cluster already exists!"
+                echo "Kubernetes: $(kubectl version -o json | jq -r '.serverVersion.gitVersion')"
+                return 1
+            fi
+        ;;
+        rancher)
+            # Fail if Rancher is already installed
+            if helm status -n cattle-system rancher &>/dev/null; then
+                echo "Rancher already exists!"
+                RANCHER_FQDN=$(helm get values -n cattle-system rancher -o json | jq -re '.hostname')
+                echo "Rancher URL: https://$RANCHER_FQDN/"
+                return 1
+            fi
+        ;;&
+        kubewarden|rancher)
+            # Fail if Kubewarden is already installed
+            if kubectl get cap &>/dev/null; then
+                echo "Kubewarden already exists!"
+                helm ls -n $NAMESPACE -o json | jq -r '"Kubewarden: \(.[0].app_version)", (.[].chart | " - " + .)'
+                return 1
+            fi
+        ;;
+        *) error "Unknown command: $cmd"; exit 1 ;;
+    esac
+    return 0
+}

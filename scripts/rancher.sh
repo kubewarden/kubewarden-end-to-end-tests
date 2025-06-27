@@ -27,12 +27,12 @@ RANCHER=${RANCHER:-}
 EXCLUDE_PATTERN="hotfix|debug|patch"
 
 # Directory of the current script
-SCRIPT_DIR="$(dirname "$0")"
+BASEDIR=$(dirname "${BASH_SOURCE[0]}")
 
 # ==================================================================================================
 # Helper functions
 
-. "$SCRIPT_DIR/../helpers/kubelib.sh"
+. "$BASEDIR/../helpers/kubelib.sh"
 
 create_k3d_cluster() {
     local rancher="$1"
@@ -44,7 +44,7 @@ create_k3d_cluster() {
         2.10*) k8s="v1.31" ;; # v1.28 - v1.31
         2.11*) k8s="v1.32" ;; # v1.30 - v1.32
     esac
-    K3S="${K3S:-$k8s}" "$SCRIPT_DIR"/cluster_k3d.sh create "${@:2}"
+    K3S="${K3S:-$k8s}" "$BASEDIR"/cluster_k3d.sh create "${@:2}"
 }
 
 # Add rancher repositories
@@ -57,6 +57,10 @@ helm_add_repositories() {
     ar e2e-rancher-community https://releases.rancher.com/server-charts/latest
     ar e2e-rancher-communityalpha https://releases.rancher.com/server-charts/alpha
     helm repo update e2e-rancher-prime e2e-rancher-primerc e2e-rancher-primealpha e2e-rancher-community e2e-rancher-communityalpha e2e-jetstack > /dev/null
+    ar e2e-rancher-head-210 https://charts.optimus.rancher.io/server-charts/release-2.10
+    ar e2e-rancher-head-211 https://charts.optimus.rancher.io/server-charts/release-2.11
+    ar e2e-rancher-head-212 https://charts.optimus.rancher.io/server-charts/release-2.12
+    helm repo update e2e-rancher-head-210 e2e-rancher-head-211 e2e-rancher-head-212 > /dev/null
 }
 
 # Find repository & highest version based on constraints
@@ -65,13 +69,26 @@ find_chart_by_constraints () {
     local q_repo q_ver charts
 
     # Parse input (RANCHER) to helm constraints (repo & semver)
-    [[ $query =~ ^(prime|p|community|c)?(alpha|rc)?(.*)$ ]]
+    [[ $query =~ ^(prime|p|community|c|head|h)?(alpha|rc)?(.*)$ ]]
     case ${BASH_REMATCH[1]} in
         p) q_repo="prime${BASH_REMATCH[2]}" ;;
         c) q_repo="community${BASH_REMATCH[2]}" ;;
+        h) q_repo="head" ;;
         *) q_repo="${BASH_REMATCH[1]}${BASH_REMATCH[2]}" ;;
     esac
+
     q_ver="${BASH_REMATCH[3]:-*}"
+    # Head repo has only devel versions, autofix query head2.12 -> head2.12-0
+    if [ "$q_repo" == "head" ]; then
+        q_ver="${BASH_REMATCH[3]:-*-0}"
+        [[ $q_ver =~ ^[0-9]\.[0-9]+$ ]] && q_ver+='-0'
+    fi
+
+    # Fix semver constraint for head 2.12<.0>-659a3fe3ac0d6ff0654717dcbd3161391d1f5662-head
+    if [[ $q_ver =~ ^([0-9]+\.[0-9]+)-([0-9a-f]{40}-head)$ ]]; then
+        q_ver="${BASH_REMATCH[1]}.0-${BASH_REMATCH[2]}"
+    fi
+
     echo "QUERY: ${q_repo:--}:${q_ver:--}"
 
     # Find charts from Q_REPOs with version matching Q_VER, ordered by version
@@ -87,7 +104,8 @@ find_chart_by_constraints () {
         s|e2e-rancher-prime/|2 &|
         s|e2e-rancher-communityalpha/|3 &|
         s|e2e-rancher-primerc/|4 &|
-        s|e2e-rancher-primealpha/|5 &|' \
+        s|e2e-rancher-primealpha/|5 &|
+        s|e2e-rancher-head-[0-9]+/|6 &|' \
         | sort -nr | awk 'END {print $2}')
 
     echo "CHART: ${CHART_REPO:--}:${CHART_VER:--}"
@@ -106,6 +124,8 @@ wait_for_rancher() {
 
 # ==================================================================================================
 # Main script
+
+precheck rancher || exit 1
 
 helm_add_repositories
 
