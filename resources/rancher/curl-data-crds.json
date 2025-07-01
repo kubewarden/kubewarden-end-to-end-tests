@@ -1,0 +1,15 @@
+{
+  "charts": [
+    {
+      "chartName": "kubewarden-crds",
+      "releaseName": "rancher-kubewarden-crds",
+      "values": {
+        "global": {
+          "priorityClassName": "",
+          "systemDefaultRegistry": "ghcr.io"
+        }
+      }
+    }
+  ],
+  "namespace": "cattle-kubewarden-system"
+}

@@ -1,0 +1,8 @@
+# Kubewarden UI extesion repository
+# k get clusterrepos kubewarden-extension-github -o yaml
+apiVersion: catalog.cattle.io/v1
+kind: ClusterRepo
+metadata:
+  name: kubewarden-extension-github
+spec:
+  url: https://rancher.github.io/kubewarden-ui/
