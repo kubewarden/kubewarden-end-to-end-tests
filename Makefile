@@ -4,7 +4,7 @@ MKFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 TESTS_DIR := $(MKFILE_DIR)tests
 RESOURCES_DIR := $(MKFILE_DIR)resources
 
-NAMESPACE ?= $(shell helm status -n cattle-system rancher &>/dev/null && echo "cattle-kubewarden-system" || echo "kubewarden")
+NAMESPACE ?= $(shell helm status -n cattle-system rancher >/dev/null 2>&1 && echo "cattle-kubewarden-system" || echo "kubewarden")
 CLUSTER_CONTEXT ?= $(shell kubectl config current-context)
 
 export NAMESPACE
