@@ -237,8 +237,10 @@ do_install_on_rancher() {
         retry "kubectl get clusterrepos $i -o json | jq -e '.status.downloadTime' > /dev/null" 5 3
     done
 
-    # Install UI extension
-    appinstall "@$datadir/curl-data-extension.json" "kubewarden-extension-github"
+    # Install UI extension (need to use compatible version)
+    local extver
+    extver=$(curl -k --fail-with-body --no-progress-meter -u "$rancher_token" "$rancher_url/v1/catalog.cattle.io.clusterrepos/kubewarden-extension-github?link=index" | jq -er '.entries.kubewarden[0].version')
+    jq -ce --arg v "$extver" '.charts[0].version = $v' "$datadir/curl-data-extension.json" | appinstall @- "kubewarden-extension-github"
 
     # Install Kubewarden charts
     local argsvar
