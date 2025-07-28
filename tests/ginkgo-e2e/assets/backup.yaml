@@ -1,0 +1,9 @@
+apiVersion: resources.cattle.io/v1
+kind: Backup
+metadata:
+  name: kubewarden-backup
+  annotations:
+    field.cattle.io/description: Backup Kubewarden resources
+spec:
+  resourceSetName: rancher-resource-set-full
+  retentionCount: 1
