@@ -1,0 +1,10 @@
+apiVersion: resources.cattle.io/v1
+kind: Restore
+metadata:
+  name: kubewarden-restore
+  annotations:
+    field.cattle.io/description: Restore Kubewarden resources
+spec:
+  backupFilename: %BACKUP_FILE%
+  deleteTimeoutSeconds: 10
+  prune: %PRUNE%
