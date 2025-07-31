@@ -17,6 +17,15 @@ runs:
         ref: main
         path: action-make
 
+    - name: Validate input
+      run: |
+        # Only allow safe characters: letters, numbers, hyphens, underscores, spaces, dots, equals
+        if [[ ! "${{ inputs.make }}" =~ ^[a-zA-Z0-9_\ -.=]+$ ]]; then
+          echo "Error: Invalid characters in make targets"
+          exit 1
+        fi
+      shell: bash
+
     - name: Execute Makefile target
       run: make ${{ inputs.make }}
       working-directory: action-make
