@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/rancher-sandbox/ele-testhelpers/kubectl"
+	"github.com/rancher-sandbox/ele-testhelpers/rancher"
 	"github.com/rancher-sandbox/ele-testhelpers/tools"
 )
 
@@ -82,6 +83,37 @@ var _ = Describe("E2E - Install Kubewarden", Label("install-kubewarden"), func()
 	It("Install Kubewarden stack", func() {
 		By("Installing Kubewarden stack", func() {
 			InstallKubewarden(k)
+		})
+		By("Deploying custom policy-server", func() {
+			// Set the policy server name and image in the policy-server.yaml file
+			policyServerImage := "ghcr.io/kubewarden/policy-server:v1.27.0"
+			err := tools.Sed("%POLICY_SERVER_NAME%", "production", policyServerYaml)
+			Expect(err).To(Not(HaveOccurred()))
+			err = tools.Sed("%POLICY_SERVER_IMAGE%", policyServerImage, policyServerYaml)
+			Expect(err).To(Not(HaveOccurred()))
+
+			// Apply the policy server
+			err = kubectl.Apply("kubewarden", policyServerYaml)
+			Expect(err).To(Not(HaveOccurred()))
+
+			// Wait for all pods to be started
+			checkList := [][]string{
+				{"kubewarden", "app.kubernetes.io/instance=policy-server-production"},
+			}
+			err = rancher.CheckPod(k, checkList)
+			Expect(err).To(Not(HaveOccurred()))
+
+		})
+		By("Deploying policies in the custom policy-server", func() {
+			err := kubectl.Apply("kubewarden", podPrivilegedYaml)
+			Expect(err).To(Not(HaveOccurred()))
+
+			// Wait for all pods to be started
+			checkList := [][]string{
+				{"kubewarden", "app.kubernetes.io/instance=policy-server-production"},
+			}
+			err = rancher.CheckPod(k, checkList)
+			Expect(err).To(Not(HaveOccurred()))
 		})
 	})
 })
@@ -204,7 +236,7 @@ var _ = Describe("E2E - Test full Backup/Restore", Label("test-full-backup-resto
 			Expect(err).To(Not(HaveOccurred()))
 
 			// And apply
-			err = kubectl.Apply(clusterNS, restoreYaml)
+			err = kubectl.Apply("kubewarden", restoreYaml)
 			Expect(err).To(Not(HaveOccurred()))
 		})
 
@@ -221,15 +253,17 @@ var _ = Describe("E2E - Test full Backup/Restore", Label("test-full-backup-resto
 		})
 
 		By("Checking Kubewarden resources after restore", func() {
-			// Check that Kubewarden policyserver is available
-			Eventually(func() string {
-				out, _ := kubectl.RunWithoutErr("get", "policyserver", "-n", clusterNS,
-					"-o", "jsonpath={.items[0].metadata.name}")
-				return out
-			}, tools.SetTimeout(5*time.Minute), 10*time.Second).Should(ContainSubstring("default"))
+			// Check that Kubewarden policyservers are available
+			for _, policyServer := range []string{"default", "production"} {
+				Eventually(func() string {
+					out, _ := kubectl.RunWithoutErr("get", "policyserver", policyServer,
+						"-o", "jsonpath={.status.conditions[?(@.type==\"DeploymentReconciled\")].status}")
+					return out
+				}, tools.SetTimeout(5*time.Minute), 10*time.Second).Should(ContainSubstring("True"))
+			}
 
+			// Check that few Kubewarden CAPs are available
 			for _, policy := range []string{"do-not-run-as-root", "no-host-namespace-sharing", "no-privileged-pod"} {
-				// Check that few Kubewarden CAPs are available
 				Eventually(func() string {
 					out, _ := kubectl.RunWithoutErr("get", "cap", policy,
 						"-o", "jsonpath={.status.policyStatus}")
@@ -237,8 +271,28 @@ var _ = Describe("E2E - Test full Backup/Restore", Label("test-full-backup-resto
 				}, tools.SetTimeout(5*time.Minute), 25*time.Second).Should(ContainSubstring("active"))
 			}
 
+			// Make sure the custom policy is still available and attached to the production policy server
+			Eventually(func() string {
+				out, _ := kubectl.RunWithoutErr("get", "ap", "pod-privileged", "-n", "kubewarden",
+					"-o", "jsonpath={.status.policyStatus}")
+				return out
+			}, tools.SetTimeout(5*time.Minute), 10*time.Second).Should(ContainSubstring("active"))
+
+			Eventually(func() string {
+				out, _ := kubectl.RunWithoutErr("get", "ap", "pod-privileged", "-n", "kubewarden",
+					"-o", "jsonpath={.spec.policyServer}")
+				return out
+			}, tools.SetTimeout(5*time.Minute), 10*time.Second).Should(ContainSubstring("production"))
+
+			// Make sure we still have our settings for the custom policy
+			Eventually(func() string {
+				out, _ := kubectl.RunWithoutErr("get", "ap", "pod-privileged", "-n", "kubewarden",
+					"-o", "jsonpath={.spec.rules[0].operations[*]}")
+				return out
+			}, tools.SetTimeout(5*time.Minute), 10*time.Second).Should(ContainSubstring("CREATE UPDATE"))
+
+			// Check that few Kubewarden deployments are available
 			for _, deployment := range []string{"policy-reporter", "policy-reporter-ui"} {
-				// Check that few Kubewarden deployments are available
 				Eventually(func() string {
 					out, _ := kubectl.RunWithoutErr("get", "deployment", deployment,
 						"-n", "kubewarden", "-o", "jsonpath={.status.availableReplicas}")

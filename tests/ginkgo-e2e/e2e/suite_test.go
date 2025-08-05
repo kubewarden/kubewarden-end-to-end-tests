@@ -34,6 +34,8 @@ const (
 	ciTokenYaml         = "../assets/local-kubeconfig-token-skel.yaml"
 	installConfigYaml   = "../../install-config.yaml"
 	localKubeconfigYaml = "../assets/local-kubeconfig-skel.yaml"
+	policyServerYaml    = "../assets/policy-server.yaml"
+	podPrivilegedYaml   = "../assets/pod-privileged.yaml"
 	restoreYaml         = "../assets/restore.yaml"
 	upgradeSkelYaml     = "../assets/upgrade_skel.yaml"
 	userName            = "root"
@@ -44,7 +46,6 @@ const (
 var (
 	auditScannerVersion         string
 	backupRestoreVersion        string
-	clusterNS                   string
 	kubewardenControllerVersion string
 	policyServerVersion         string
 	k3sVersion                  string
