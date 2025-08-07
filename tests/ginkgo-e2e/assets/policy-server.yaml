@@ -1,0 +1,7 @@
+apiVersion: policies.kubewarden.io/v1
+kind: PolicyServer
+metadata:
+  name: %POLICY_SERVER_NAME%
+spec:
+  image: %POLICY_SERVER_IMAGE%
+  replicas: 1
