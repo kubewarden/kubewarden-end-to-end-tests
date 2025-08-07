@@ -7,7 +7,10 @@ RESOURCES_DIR := $(MKFILE_DIR)resources
 NAMESPACE ?= $(shell helm status -n cattle-system rancher >/dev/null 2>&1 && echo "cattle-kubewarden-system" || echo "kubewarden")
 CLUSTER_CONTEXT ?= $(shell kubectl config current-context)
 
-export NAMESPACE
+# Should match version in https://docs.kubewarden.io/reference/dependency-matrix
+OTEL_OPERATOR ?= 0.92.3
+
+export NAMESPACE OTEL_OPERATOR
 
 # ==================================================================================================
 # Optional arguments for scripts
