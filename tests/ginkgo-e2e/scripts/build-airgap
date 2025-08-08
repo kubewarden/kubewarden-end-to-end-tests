@@ -53,12 +53,13 @@ function RunSkopeoCmdWithRetry() {
 }
 
 # Variable(s)
+DEPLOY_AIRGAP_SCRIPT=$(realpath ../scripts/deploy-airgap)
 K3S_VERSION=$1
 KUBEWARDEN_VERSION=latest
 KUBEWARDEN_REPO=https://charts.kubewarden.io
-DEPLOY_AIRGAP_SCRIPT=$(realpath ../scripts/deploy-airgap)
-OPT_RANCHER="${HOME}/airgap_rancher"
 HAULER_BIN=/usr/local/bin/hauler
+HAULER_MANIFEST="/home/gh-runner/actions-runner/_work/helm-charts/helm-charts/charts/hauler_manifest.yaml"
+OPT_RANCHER="${HOME}/airgap_rancher"
 REPO_SERVER="rancher-manager.test:5000"
 
 # Install hauler
@@ -68,8 +69,8 @@ sudo mv $HOME/hauler ${HAULER_BIN}
 # Install packages
 sudo zypper --no-refresh -n in skopeo yq
 
-# Create directories
-mkdir -p ${OPT_RANCHER}/{k3s,helm} ${OPT_RANCHER}/images/registry
+# Create directory
+mkdir -p ${OPT_RANCHER}/k3s
 cd ${OPT_RANCHER}
 
 # Add rancher manager in /etc/hosts
@@ -90,44 +91,11 @@ done
 # Add k3s artifacts to hauler
 ${HAULER_BIN} store add file ${OPT_RANCHER}/k3s
 
-# Get Helm Charts
-cd ${OPT_RANCHER}/helm/
-
-# Add repos
-RunHelmCmdWithRetry repo add kubewarden ${KUBEWARDEN_REPO} >/dev/null 2>&1
-RunHelmCmdWithRetry repo update >/dev/null 2>&1
-
-# Get Kubewarden charts
-[[ "${KUBEWARDEN_VERSION}" == "latest" ]] &&
-  DEVEL="--devel" ||
-  unset DEVEL
-for i in kubewarden-crds kubewarden-controller kubewarden-defaults; do
-  RunHelmCmdWithRetry pull ${DEVEL} kubewarden/${i} >/dev/null 2>&1
-done
-
-# Extract image and policy files list
-tar -xvzf kubewarden-controller* kubewarden-controller/imagelist.txt
-tar -xvzf kubewarden-defaults* kubewarden-defaults/{imagelist.txt,policylist.txt}
-# Remove registry from policylist.txt
-sed -i 's|^registry://||' ${OPT_RANCHER}/helm/kubewarden-defaults/policylist.txt
-
-# Get container images
-cd ${OPT_RANCHER}/images/
-
-# Add helm charts to hauler store
+# Pull Kubewarden artifacts using the Hauler manifest
 cd ${OPT_RANCHER}
-${HAULER_BIN} store add chart ./helm/kubewarden-crds-* --repo .
-${HAULER_BIN} store add chart ./helm/kubewarden-controller-* --repo .
-${HAULER_BIN} store add chart ./helm/kubewarden-defaults-* --repo .
+${HAULER_BIN} store sync --filename ${HAULER_MANIFEST}
 
-# Add images to hauler store
-for i in $(<${OPT_RANCHER}/helm/kubewarden-controller/imagelist.txt) \
-  $(<${OPT_RANCHER}/helm/kubewarden-defaults/policylist.txt)         \
-  $(<${OPT_RANCHER}/helm/kubewarden-defaults/imagelist.txt); do
-  hauler store add image ${i} --platform linux/amd64
-done
-
-## Skopeo - Registry
+# Skopeo - Registry
 # We need this image to build our internal registry
 RunSkopeoCmdWithRetry copy --additional-tag registry:latest docker://registry:latest docker-archive:registry.tar
 ${HAULER_BIN} store add file registry.tar
