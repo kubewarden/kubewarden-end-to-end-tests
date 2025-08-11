@@ -152,10 +152,17 @@ export -f kuberun
 # Check before running a command
 precheck() {
     local cmd="$1"
+
+    # https://gitlab.suse.de/OPS-Service/salt/-/merge_requests/5326
+    if grep -wi 'search.*suse.de' /etc/resolv.conf; then
+        error "Search suse.de will trigger ndots issue"
+        return 1
+    fi
+
     case "$cmd" in
         cluster)
             if kubectl cluster-info &>/dev/null; then
-                echo "Cluster already exists!"
+                error "Cluster already exists!"
                 echo "Kubernetes: $(kubectl version -o json | jq -r '.serverVersion.gitVersion')"
                 return 1
             fi
@@ -163,7 +170,7 @@ precheck() {
         rancher)
             # Fail if Rancher is already installed
             if helm status -n cattle-system rancher &>/dev/null; then
-                echo "Rancher already exists!"
+                error "Rancher already exists!"
                 RANCHER_FQDN=$(helm get values -n cattle-system rancher -o json | jq -re '.hostname')
                 echo "Rancher URL: https://$RANCHER_FQDN/"
                 return 1
@@ -172,7 +179,7 @@ precheck() {
         kubewarden|rancher)
             # Fail if Kubewarden is already installed
             if kubectl get cap &>/dev/null; then
-                echo "Kubewarden already exists!"
+                error "Kubewarden already exists!"
                 helm ls -n $NAMESPACE -o json | jq -r '"Kubewarden: \(.[0].app_version)", (.[].chart | " - " + .)'
                 return 1
             fi
