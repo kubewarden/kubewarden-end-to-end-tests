@@ -231,16 +231,17 @@ do_install_on_rancher() {
         echo "$result"
     }
 
-    # Add repositories
-    for i in kubewarden-extension-github kubewarden-charts; do
+    # Add extension & kubewarden repositories
+    local extrepo extver
+    curl -k --fail-with-body --no-progress-meter "$rancher_url/rancherversion" | jq -re '.RancherPrime == "true"' && extrepo=rancher-ui-plugins || extrepo=kubewarden-extension-github
+    for i in $extrepo kubewarden-charts; do
         kubectl get clusterrepos "$i" &>/dev/null || kubectl apply -f "$datadir/repo-$i.yaml"
         retry "kubectl get clusterrepos $i -o json | jq -e '.status.downloadTime' > /dev/null" 5 3
     done
 
-    # Install UI extension (need to use compatible version)
-    local extver
-    extver=$(curl -k --fail-with-body --no-progress-meter -u "$rancher_token" "$rancher_url/v1/catalog.cattle.io.clusterrepos/kubewarden-extension-github?link=index" | jq -er '.entries.kubewarden[0].version')
-    jq -ce --arg v "$extver" '.charts[0].version = $v' "$datadir/curl-data-extension.json" | appinstall @- "kubewarden-extension-github"
+    # Install UI extension
+    extver=$(curl -k --fail-with-body --no-progress-meter -u "$rancher_token" "$rancher_url/v1/catalog.cattle.io.clusterrepos/$extrepo?link=index" | jq -er '.entries.kubewarden[0].version')
+    jq -ce --arg v "$extver" '.charts[0].version = $v' "$datadir/curl-data-extension.json" | appinstall @- "$extrepo"
 
     # Install Kubewarden charts
     local argsvar
