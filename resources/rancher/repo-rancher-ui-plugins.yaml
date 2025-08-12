@@ -1,0 +1,8 @@
+# Rancher official extesion repository
+apiVersion: catalog.cattle.io/v1
+kind: ClusterRepo
+metadata:
+  name: rancher-ui-plugins
+spec:
+  gitBranch: main
+  gitRepo: https://github.com/rancher/ui-plugin-charts
