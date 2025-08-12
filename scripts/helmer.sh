@@ -327,10 +327,11 @@ case $1 in
         load_env;;&
 
     # Handle kubewarden requirements
-    in|install|up|upgrade) setup_requirements;;&
+    in|install|up|upgrade) [ -v DRY ] || setup_requirements;;&
 
     # Call action function
     in|install)
+        [ -v DRY ] && { echo "Install $VERSION: ($(print_version_map))"; exit 0; }
         precheck kubewarden || exit 1
         do_install${RANCHER:+_on_rancher} "${@:2}";;
     up|upgrade) do_upgrade "${@:2}";;

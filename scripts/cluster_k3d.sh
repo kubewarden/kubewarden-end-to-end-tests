@@ -19,13 +19,14 @@ BASEDIR=$(dirname "${BASH_SOURCE[0]}")
 
 # Create new cluster
 if [ "${1:-}" == 'create' ]; then
-    precheck cluster || exit 1
+    [ -v DRY ] || { precheck cluster || exit 1; }
 
     # Complete partial K3S version from dockerhub v1.30 -> v1.30.5-k3s1
     if [[ ! $K3S =~ ^v[0-9.]+-k3s[0-9]$ ]]; then
         K3S=$(curl -L -s "https://registry.hub.docker.com/v2/repositories/rancher/k3s/tags?page_size=20&name=$K3S" | jq -re 'first(.results[].name | select(test("^v[0-9.]+-k3s[0-9]$")))')
         echo "K3S version: $K3S"
     fi
+    [ -v DRY ] && exit 0
 
     # Generate certificates
     if [ -n "${MTLS:-}" ]; then
