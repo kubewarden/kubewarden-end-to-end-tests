@@ -125,7 +125,7 @@ wait_for_rancher() {
 # ==================================================================================================
 # Main script
 
-precheck rancher || exit 1
+[ -v DRY ] || { precheck rancher || exit 1; }
 
 helm_add_repositories
 
@@ -143,6 +143,8 @@ fi
 RANCHER_FQDN=${RANCHER_FQDN:-$(kubectl get svc traefik -n kube-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}').nip.io}
 # Required for prime Alpha & RC
 [[ $CHART_REPO =~ ^e2e-rancher-prime(alpha|rc) ]] && stgregistry=1
+
+[ -v DRY ] && exit 0
 
 # Install cert-manager
 helm install --wait cert-manager e2e-jetstack/cert-manager -n cert-manager --create-namespace --set crds.enabled=true
