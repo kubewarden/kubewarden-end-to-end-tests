@@ -13,7 +13,8 @@ runs:
     - name: Checkout kubewarden-end-to-end-tests
       uses: actions/checkout@v5
       with:
-        repository: ${{ github.repository_owner }}/kubewarden-end-to-end-tests
+        # Using {{ github.repository_owner }} would fail in other orgs
+        repository: kubewarden/kubewarden-end-to-end-tests
         ref: main
         path: action-make
 
