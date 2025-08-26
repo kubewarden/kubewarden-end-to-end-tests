@@ -154,7 +154,7 @@ precheck() {
     local cmd="$1"
 
     # https://gitlab.suse.de/OPS-Service/salt/-/merge_requests/5326
-    if grep -wi 'search.*suse.de' /etc/resolv.conf; then
+    if grep -wi 'search.*\ssuse.de' /etc/resolv.conf; then
         error "Search suse.de will trigger ndots issue"
         return 1
     fi

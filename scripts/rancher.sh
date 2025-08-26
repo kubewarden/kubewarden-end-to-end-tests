@@ -118,7 +118,18 @@ wait_for_rancher() {
         output+=$(kubectl get pods --no-headers -o wide -n cattle-system | grep -vw Completed || echo 'Wait: cattle-system')$'\n'
         output+=$(kubectl get pods --no-headers -o wide -n cattle-fleet-system | grep -vw Completed || echo 'Wait: cattle-fleet-system')$'\n'
         grep -vE '([0-9]+)/\1 +Running|^$' <<< "$output" || break
-        [ "$i" -ne 20 ] && sleep 30 || { echo "Godot: pods not running"; exit 1; }
+        [ "$i" -ne 20 ] && sleep 30 || {
+            kubectl get pods -n cattle-system;
+            kubectl get pods -n cattle-fleet-system;
+            kubectl get events -n cattle-system;
+            kubectl get events -n cattle-fleet-system;
+            kubectl logs -n cattle-system -l app=rancher;
+            kubectl logs -n cattle-system -l app=rancher-webhook;
+            kubectl logs -n cattle-system -l app.kubernetes.io/component=controller;
+            kubectl logs -n cattle-fleet-system -l app=fleet-controller;
+            kubectl logs -n cattle-fleet-system -l app=gitjob;
+            echo "Godot: pods not running";
+            exit 1; }
     done
 }
 
