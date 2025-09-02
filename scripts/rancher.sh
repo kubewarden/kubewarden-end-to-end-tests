@@ -166,7 +166,7 @@ helm install rancher "$CHART_REPO" --version "$CHART_VER" \
     --namespace cattle-system --create-namespace \
     --set hostname="$RANCHER_FQDN" \
     --set bootstrapPassword=sa \
-    --wait --timeout=10m \
+    --wait --timeout=15m \
     --set replicas=1 \
     ${stgregistry:+--set rancherImage=stgregistry.suse.com/rancher/rancher} \
     ${stgregistry:+--set extraEnv[0].name=CATTLE_AGENT_IMAGE} \

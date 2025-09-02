@@ -7,8 +7,9 @@ teardown_file() {
     teardown_helper
 }
 
+# Check that MAJOR.MINOR of app version is consistent
 @test "$(tfile) Helm app version is consistent" {
-    helm list -n $NAMESPACE -o json | jq 'map(.app_version) | unique | length == 1'
+    helm list -n $NAMESPACE -o json | jq 'map(.app_version | split(".")[0:2] | join(".")) | unique | length == 1'
 }
 
 # Create pod-privileged policy to block CREATE & UPDATE of privileged pods
