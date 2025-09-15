@@ -321,7 +321,7 @@ do_reset() {
 
 case $1 in
     # Build version map of charts
-    in|install|up|upgrade)
+    in|install|up|upgrade|versions)
         make_version_map;;&
     reinstall|uninstall|set|reset)
         load_env;;&
@@ -330,6 +330,8 @@ case $1 in
     in|install|up|upgrade) [ -v DRY ] || setup_requirements;;&
 
     # Call action function
+    versions)
+        echo "Version map: ($(print_version_map))"; exit 0;;
     in|install)
         [ -v DRY ] && { echo "Install $VERSION: ($(print_version_map))"; exit 0; }
         precheck kubewarden || exit 1
