@@ -1,6 +1,12 @@
 #!/bin/bash
 
 # Build Airgap
+# This script will build an airgap bundle using hauler
+# It will download k3s and kubewarden artifacts and store them in a hauler store
+# Finally it will export the hauler store to a tar file
+# Usage: build-airgap <K3S_VERSION> <TEST_TYPE>
+# Example: build-airgap v1.26.4+k3s1 install|upgrade
+# Note: TEST_TYPE is used to determine which hauler manifest to use (install or upgrade)
 
 set -vx
 
@@ -54,11 +60,15 @@ function RunSkopeoCmdWithRetry() {
 
 # Variable(s)
 DEPLOY_AIRGAP_SCRIPT=$(realpath ../scripts/deploy-airgap)
+UPGRADE_AIRGAP_SCRIPT=$(realpath ../scripts/upgrade-airgap)
 K3S_VERSION=$1
+TEST_TYPE=$2
 KUBEWARDEN_VERSION=latest
 KUBEWARDEN_REPO=https://charts.kubewarden.io
 HAULER_BIN=/usr/local/bin/hauler
-HAULER_MANIFEST="/home/gh-runner/actions-runner/_work/helm-charts/helm-charts/charts/hauler_manifest.yaml"
+HAULER_PATH="/home/gh-runner/actions-runner/_work/helm-charts/helm-charts/charts"
+HAULER_MANIFEST="${HAULER_PATH}/hauler_manifest.yaml"
+HAULER_MANIFEST_PREV="${HAULER_PATH}/hauler_manifest_prev.yaml"
 OPT_RANCHER="${HOME}/airgap_rancher"
 REPO_SERVER="rancher-manager.test:5000"
 
@@ -85,7 +95,7 @@ for i in k3s-airgap-images-amd64.tar.zst k3s; do
   curl -sfL https://get.k3s.io -o ${OPT_RANCHER}/k3s/install.sh
 
   # Get the airgap deploy script
-  cp ${DEPLOY_AIRGAP_SCRIPT} ${OPT_RANCHER}/k3s
+  cp ${DEPLOY_AIRGAP_SCRIPT} ${UPGRADE_AIRGAP_SCRIPT} ${OPT_RANCHER}/k3s
 done
 
 # Add k3s artifacts to hauler
@@ -93,7 +103,11 @@ ${HAULER_BIN} store add file ${OPT_RANCHER}/k3s
 
 # Pull Kubewarden artifacts using the Hauler manifest
 cd ${OPT_RANCHER}
-${HAULER_BIN} store sync --filename ${HAULER_MANIFEST}
+if [[ "$TEST_TYPE" == "upgrade" ]] ; then
+  ${HAULER_BIN} store sync --filename ${HAULER_MANIFEST_PREV}
+else
+  ${HAULER_BIN} store sync --filename ${HAULER_MANIFEST}
+fi
 
 # Skopeo - Registry
 # We need this image to build our internal registry

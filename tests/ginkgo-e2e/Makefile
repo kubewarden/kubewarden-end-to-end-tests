@@ -12,6 +12,9 @@ deps:
 e2e-airgap-rancher: deps
 	ginkgo --label-filter airgap-rancher -r -v ./e2e
 
+e2e-airgap-upgrade: deps
+	ginkgo --label-filter airgap-upgrade -r -v ./e2e
+
 e2e-full-backup-restore: deps
 	ginkgo --label-filter test-full-backup-restore -r -v ./e2e
 
@@ -26,3 +29,6 @@ e2e-install-k3s: deps
 
 e2e-prepare-archive: deps
 	ginkgo --label-filter prepare-archive -r -v ./e2e
+
+e2e-prepare-upgrade: deps
+	ginkgo --label-filter prepare-upgrade -r -v ./e2e
