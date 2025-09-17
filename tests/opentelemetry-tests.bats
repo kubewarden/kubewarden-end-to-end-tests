@@ -43,7 +43,7 @@ export -f get_metrics # required by retry command
         -n cert-manager --create-namespace \
         --set crds.enabled=true
 
-    # OpemTelementry
+    # OpenTelemetry
     helm repo add --force-update open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
     helm upgrade -i --wait my-opentelemetry-operator open-telemetry/opentelemetry-operator \
         --set "manager.collectorImage.repository=otel/opentelemetry-collector-contrib" \
