@@ -30,6 +30,7 @@ import (
 
 const (
 	airgapBuildScript   = "../scripts/build-airgap"
+	airgapUpgradeScript = "../scripts/upgrade-airgap"
 	backupYaml          = "../assets/backup.yaml"
 	ciTokenYaml         = "../assets/local-kubeconfig-token-skel.yaml"
 	installConfigYaml   = "../../install-config.yaml"
@@ -51,6 +52,7 @@ var (
 	k3sVersion                  string
 	netDefaultFileName          string
 	rancherHostname             string
+	testType                    string
 )
 
 func CheckBackupRestore(v string) {
@@ -280,4 +282,5 @@ var _ = BeforeSuite(func() {
 	k3sVersion = os.Getenv("K3S_VERSION")
 	netDefaultFileName = "../assets/net-default-airgap.xml"
 	rancherHostname = os.Getenv("PUBLIC_FQDN")
+	testType = os.Getenv("TEST_TYPE")
 })

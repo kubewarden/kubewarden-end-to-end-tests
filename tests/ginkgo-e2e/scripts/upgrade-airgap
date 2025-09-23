@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -aeEuo pipefail
+
+# Upgrade Airgap
+# This script has two modes: build and deploy
+# Usage: upgrade-airgap build|deploy
+#  build: pulls Kubewarden artifacts from latest Hauler manifest and creates an archive file
+#  deploy: loads the Hauler archive file in Hauler storeand loads images into the local registry
+
+# Variable(s)
+ARCHIVE_FILE=haul_upgrade.tar.zst
+DEST_OPT_RANCHER="/opt/rancher"
+HAULER_BIN=/usr/local/bin/hauler
+HAULER_MANIFEST="/home/gh-runner/actions-runner/_work/helm-charts/helm-charts/charts/hauler_manifest.yaml"
+LOCAL_OPT_RANCHER="${HOME}/airgap_upgrade"
+
+if [[ "$1" == "build" ]]; then
+  # Pull Kubewarden artifacts using the latest Hauler manifest
+  mkdir -p "${LOCAL_OPT_RANCHER}"
+  cd ${LOCAL_OPT_RANCHER}
+  ${HAULER_BIN} store sync --filename ${HAULER_MANIFEST}
+
+  # Export the hauler store to an archive file
+  ${HAULER_BIN} store save --platform linux/amd64 -f ${ARCHIVE_FILE}
+  exit 0
+fi
+
+if [[ "$1" == "deploy" ]]; then
+  # Load the Hauler archive file in Hauler store
+  cd "${DEST_OPT_RANCHER}"
+  ${HAULER_BIN} store load --filename ${ARCHIVE_FILE}
+  # Load images inside the local registry
+  ${HAULER_BIN} store copy registry://localhost:5000
+  exit 0
+fi
