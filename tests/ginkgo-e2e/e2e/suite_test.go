@@ -117,6 +117,7 @@ func InstallBackupOperator(k *kubectl.Kubectl) {
 			flags = append(flags,
 				"--set", "persistence.enabled=true",
 				"--set", "persistence.storageClass=local-path",
+				"--set", "optionalResources.kubewardenUserCRs.enabled=true",
 			)
 		}
 
