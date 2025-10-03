@@ -1,78 +1,49 @@
 name: End-to-end tests
 
 on:
-  workflow_call:
-    inputs:
-      controller-image-repository:
-        description: "Define the controller container image repository"
-        type: string
-        required: false
-        default: ""
-      controller-image-tag:
-        description: "Define the controller container image tag"
-        required: false
-        type: string
-        default: ""
-      controller-container-image-artifact:
-        description: "Load the image used in the deployment from local artifact"
-        type: string
-        required: false
-        default: ""
-      policy-server-repository:
-        description: "Define the policy server container image tag"
-        type: string
-        required: false
-        default: "ghcr.io/kubewarden/policy-server"
-      policy-server-tag:
-        description: "Define the policy server container image tag"
-        type: string
-        required: false
-        default: "latest"
-      policy-server-container-image-artifact:
-        description: "Define the artifact containing the policy server container image"
-        type: string
-        required: false
-        default: ""
+  workflow_dispatch:
+  # pull_request:
+  #   branches:
+  #     - "main"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  kubewarden-e2e-tests:
-    name: "Kubewarden basic end-to-end tests"
-    runs-on: [self-hosted]
+  e2e:
+    runs-on: ubuntu-latest
+
     steps:
-      - name: "Checkout end-to-end repository"
-        uses: actions/checkout@v5
-        with:
-          repository: "${{ github.repository_owner }}/kubewarden-end-to-end-tests"
-          path: "e2e-tests"
-          ref: 'main'
-          submodules: 'true'
-      - name: "Setup bats testing framework"
-        run: sudo apt install -y bats
-      - name: "Install kwctl"
+      - name: "Kwctl"
         uses: kubewarden/github-actions/kwctl-installer@main
         with:
           KWCTL_VERSION: latest
-      - name: "Create Kubernetes cluster with Kubewarden installed"
-        uses: kubewarden/github-actions/setup-kubewarden-cluster-action@main
+
+      - name: Dependencies
+        run: |
+          sudo npm install -g bats
+          wget -q -O - https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          helm repo add kubewarden https://charts.kubewarden.io
+
+      - name: Checkout tested code
+        uses: actions/checkout@v5
         with:
-          controller-image-repository: ${{ inputs.controller-image-repository }}
-          controller-image-tag: ${{ inputs.controller-image-tag }}
-          controller-container-image-artifact: ${{ inputs.controller-container-image-artifact }}
-          policy-server-repository: ${{ inputs.policy-server-repository }}
-          policy-server-tag: ${{ inputs.policy-server-tag }}
-          policy-server-container-image-artifact: ${{ inputs.policy-server-container-image-artifact }}
-          cluster-name: ${{ github.repository_owner }}-ghactions-cluster
-      - name: "Run all end-to-end tests"
-        run: |
-          make --directory e2e-tests tests audit-scanner-installation.bats
-        shell: bash
+          submodules: "true"
+
+      - name: Checkout Helm Charts
+        uses: actions/checkout@v5
+        with:
+          repository: kubewarden/helm-charts
+          sparse-checkout: charts
+          path: helm-charts
+          ref: main
+
+      - name: Run Tests
+        run: make install tests
         env:
-          CLUSTER_NAME: ${{ github.repository_owner }}-ghactions-cluster
-      - name: "Uninstall Kuberwarden"
-        run: |
-          # TODO - share release with the create-kubewarden-cluster action
-          helm uninstall --wait -n kubewarden kubewarden-defaults
-          helm uninstall --wait -n kubewarden kubewarden-controller
-          helm uninstall --wait -n kubewarden kubewarden-crds
-        env:
-          HELM_KUBECONTEXT: k3d-${{ github.repository_owner }}-ghactions-cluster
+          CHARTS_LOCATION: ./helm-charts/charts
