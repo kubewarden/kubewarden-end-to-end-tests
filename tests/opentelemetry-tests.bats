@@ -44,9 +44,10 @@ export -f get_metrics # required by retry command
         --set crds.enabled=true
 
     # OpenTelemetry
+    # https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-operator/UPGRADING.md
     helm repo add --force-update open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
     helm upgrade -i --wait my-opentelemetry-operator open-telemetry/opentelemetry-operator \
-        --set "manager.collectorImage.repository=otel/opentelemetry-collector-contrib" \
+        --set "manager.collectorImage.repository=ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib" \
         --version "${OTEL_OPERATOR:-*}" \
         -n open-telemetry --create-namespace
 
@@ -76,8 +77,10 @@ export -f get_metrics # required by retry command
     # Controller is restarted to get sidecar
     wait_pods -n $NAMESPACE
 
-    # Check all pods have sidecar (otc-container) - might take a minute to start
-    retry "kubectl get pods -n kubewarden --field-selector=status.phase==Running -o json | jq -e '[.items[].spec.containers[1].name == \"otc-container\"] | all'"
+    # Check kubewarden pods have sidecar (otc-container) - might take a minute to start
+    retry "kubectl get pods -n $NAMESPACE -l 'app.kubernetes.io/component in (controller,policy-server)' -o json \
+        | jq -e 'all(.items[]; any(.spec.initContainers[]; .name == \"otc-container\"))'"
+
     # Policy server service has the metrics ports
     kubectl get services -n $NAMESPACE  policy-server-default -o json | jq -e '[.spec.ports[].name == "metrics"] | any'
     # Controller service has the metrics ports
@@ -121,7 +124,7 @@ export -f get_metrics # required by retry command
     wait_pods -n $NAMESPACE
 
     # Check sidecars (otc-container) - have been removed
-    retry "kubectl get pods -n kubewarden -o json | jq -e '[.items[].spec.containers[1].name != \"otc-container\"] | all'"
+    retry "kubectl get pods -n $NAMESPACE -o json | jq -e 'all(.items[]; .spec.initContainers[]?.name != \"otc-container\")'"
     # Policy server service has no metrics ports
     kubectl get services -n $NAMESPACE policy-server-default -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
     # Controller service has no metrics ports
