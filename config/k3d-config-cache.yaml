@@ -1,8 +1,17 @@
-# Configure pull-through cache for Docker Hub (default)
+# Configure pull-through cache for DockerHub and GHCR
 # https://k3d.io/v5.8.3/usage/registries/#creating-a-registry-proxy-pull-through-registry
 
 apiVersion: k3d.io/v1alpha5
 kind: Simple
+
+# Disable default registry endpoint to avoid pulling images from Docker Hub directly (testing cache)
+# --k3s-arg "--disable-default-registry-endpoint@all:*"
+# options:
+#   k3s:
+#     extraArgs:
+#       - arg: "--disable-default-registry-endpoint"
+#         nodeFilters:
+#           - all:*
 
 registries:
   create:
@@ -17,7 +26,13 @@ registries:
 
   config: |
     mirrors:
-      # Pull-through cache for Docker Hub
+      # DockerHub cache is created automatically
       "docker.io":
         endpoint:
           - http://k3d-docker.io:5000
+
+      # GHCR cache is used if k3d-ghcr.io registry exists, to create it run:
+      # k3d registry create ghcr.io --proxy-remote-url https://ghcr.io -v /var/cache/registry/ghcr-io:/var/lib/registry
+      "ghcr.io":
+        endpoint:
+          - http://k3d-ghcr.io:5000
