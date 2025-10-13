@@ -50,6 +50,8 @@ $(foreach var,$(VARIABLES),$(if $(call is_falsy,$(var)),$(eval override $(var)=)
 TESTFILES := $(notdir $(wildcard $(TESTS_DIR)/*.bats))
 # Filter out audit-scanner-installation because it reinstalls kubewarden
 FILTERED := $(filter-out audit-scanner-installation.bats, $(TESTFILES))
+# Disable because of https://github.com/kubewarden/policy-server/pull/1302
+FILTERED := $(filter-out secure-supply-chain-tests.bats, $(TESTFILES))
 # Filter out mutual-tls if MTLS is not set
 ifeq ($(MTLS),)
     FILTERED := $(filter-out mutual-tls.bats, $(FILTERED))
