@@ -15,6 +15,10 @@ get_report() {
     local ruid=$(kubectl get $resource -o jsonpath='{.metadata.uid}')
     # Figure out if resource report is namespaced or not
     kubectl api-resources --no-headers --namespaced=false | grep -w ${resource%/*} >/dev/null && rtype=cpolr || rtype=polr
+    # Switch to openreports CRDs
+    if helm get values -n kubewarden kubewarden-controller -o json | jq -er '.auditScanner.reportCrdsKind == "openreports"'; then
+        [ "$rtype" == "cpolr" ] && rtype="creps" || rtype="reps"
+    fi
     # Print resource report
     kubectl get $rtype $ruid -o json | jq -c '.'
 }
