@@ -85,8 +85,12 @@ var _ = Describe("E2E - Install Kubewarden", Label("install-kubewarden"), func()
 			InstallKubewarden(k)
 		})
 		By("Deploying custom policy-server", func() {
+			// Get current version of policy-server
+			policyServerImage, _ := kubectl.Run("get", "deployment", "policy-server-default",
+				"-n", "kubewarden", "-o", "jsonpath={.spec.template.spec.containers[0].image}")
+			Expect(policyServerImage).To(Not(BeEmpty()))
+
 			// Set the policy server name and image in the policy-server.yaml file
-			policyServerImage := "ghcr.io/kubewarden/policy-server:v1.27.0"
 			err := tools.Sed("%POLICY_SERVER_NAME%", "production", policyServerYaml)
 			Expect(err).To(Not(HaveOccurred()))
 			err = tools.Sed("%POLICY_SERVER_IMAGE%", policyServerImage, policyServerYaml)
