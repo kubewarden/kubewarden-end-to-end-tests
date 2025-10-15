@@ -78,9 +78,9 @@ export -f get_metrics # required by retry command
     wait_pods -n $NAMESPACE
 
     # Check kubewarden pods have sidecar (otc-container) - might take a minute to start
+    # k8s 1.29 moved to initContainers, support both since we test also old versions
     retry "kubectl get pods -n $NAMESPACE -l 'app.kubernetes.io/component in (controller,policy-server)' -o json \
-        | jq -e 'all(.items[]; any(.spec.initContainers[]; .name == \"otc-container\"))'"
-
+        | jq -e 'all(.items[]; (.spec.initContainers[]?, .spec.containers[]) | select(.name == \"otc-container\"))'"
     # Policy server service has the metrics ports
     kubectl get services -n $NAMESPACE  policy-server-default -o json | jq -e '[.spec.ports[].name == "metrics"] | any'
     # Controller service has the metrics ports
@@ -124,7 +124,8 @@ export -f get_metrics # required by retry command
     wait_pods -n $NAMESPACE
 
     # Check sidecars (otc-container) - have been removed
-    retry "kubectl get pods -n $NAMESPACE -o json | jq -e 'all(.items[]; .spec.initContainers[]?.name != \"otc-container\")'"
+    retry "kubectl get pods -n $NAMESPACE -o json \
+        | jq -e 'all(.items[]; (.spec.initContainers + .spec.containers | map(.name) | contains([\"otc-container\"]) | not))'"
     # Policy server service has no metrics ports
     kubectl get services -n $NAMESPACE policy-server-default -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
     # Controller service has no metrics ports
