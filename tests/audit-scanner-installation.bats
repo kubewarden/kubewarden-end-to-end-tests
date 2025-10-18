@@ -4,10 +4,6 @@ setup() {
     setup_helper
 }
 
-# Hardcode PolicyReports to v1alpha2 from clusterpolicyreports.wgpolicyk8s.io and not clusterpolicyreports.x-k8s.io
-# We will need to migrate later in time.
-CRD_BASE=https://raw.githubusercontent.com/kubernetes-sigs/wg-policy-prototypes/af8c5984c89aa95d8a6719d3994e71ecc31ce6c3/policy-report/crd/v1alpha2/
-
 function kubewarden_uninstall {
     helmer uninstall defaults --ignore-not-found
     helmer uninstall controller
@@ -18,11 +14,11 @@ function kubewarden_uninstall {
 function assert_crds {
     run kubectl api-resources --no-headers
     if $1; then
-        assert_output -p 'ClusterPolicyReport'
-        assert_output -p 'PolicyReport'
+        assert_line --regexp '\sClusterReport$'
+        assert_line --regexp '\sReport$'
     else
-        refute_output -p 'ClusterPolicyReport'
-        refute_output -p 'PolicyReport'
+        refute_line --regexp '\sClusterReport$'
+        refute_line --regexp '\sReport$'
     fi
 }
 
@@ -52,26 +48,24 @@ function assert_cronjob {
 # bats test_tags=setup:--no-wait
 @test "$(tfile) Install with CRDs pre-installed" {
     # Install kubewarden with custom policyreport-crds
-    kubectl create -f $CRD_BASE/wgpolicyk8s.io_policyreports.yaml
-    kubectl create -f $CRD_BASE/wgpolicyk8s.io_clusterpolicyreports.yaml
+    kubectl apply -f https://raw.githubusercontent.com/openreports/reports-api/refs/heads/main/config/install.yaml
     assert_crds true
 
     # Install kubewarden with existing policyreport crds
-    helmer reinstall crds --set installPolicyReportCRDs=False
+    helmer reinstall crds --set installOpenReportsCRDs=False
     helmer reinstall controller
     assert_cronjob true
 
     # Check policy reports did not come from helm (have no labels)
-    kubectl get crds policyreports.wgpolicyk8s.io -o json | jq -e '.metadata.labels == null'
-    kubectl get crds clusterpolicyreports.wgpolicyk8s.io -o json | jq -e '.metadata.labels == null'
+    kubectl get crds reports.openreports.io -o json | jq -e '.metadata.labels == null'
+    kubectl get crds clusterreports.openreports.io -o json | jq -e '.metadata.labels == null'
 
     # Kubewarden should not remove custom crds
     kubewarden_uninstall
     assert_crds true
     assert_cronjob false
 
-    kubectl delete -f $CRD_BASE/wgpolicyk8s.io_policyreports.yaml
-    kubectl delete -f $CRD_BASE/wgpolicyk8s.io_clusterpolicyreports.yaml
+    kubectl delete -f https://raw.githubusercontent.com/openreports/reports-api/refs/heads/main/config/install.yaml
     assert_crds false
 }
 
@@ -82,6 +76,6 @@ function assert_cronjob {
     assert_cronjob true
 
     # Check crds were installed by helm
-    kubectl get crds policyreports.wgpolicyk8s.io --show-labels | grep 'managed-by=Helm'
-    kubectl get crds clusterpolicyreports.wgpolicyk8s.io --show-labels | grep 'managed-by=Helm'
+    kubectl get crds reports.openreports.io --show-labels | grep 'managed-by=Helm'
+    kubectl get crds clusterreports.openreports.io --show-labels | grep 'managed-by=Helm'
 }
