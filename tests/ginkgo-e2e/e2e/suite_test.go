@@ -187,6 +187,7 @@ func InstallKubewarden(k *kubectl.Kubectl) {
 			flags = append(flags,
 				"--set", "auditScanner.policyReporter=true",
 				"--set", "auditScanner.cronJob.schedule=*/2 * * * *",
+				"--set", "auditScanner.reportCRDsKind=openreports",
 			)
 		}
 
