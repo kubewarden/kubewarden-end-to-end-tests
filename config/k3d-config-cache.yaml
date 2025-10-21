@@ -1,0 +1,23 @@
+# Configure pull-through cache for Docker Hub (default)
+# https://k3d.io/v5.8.3/usage/registries/#creating-a-registry-proxy-pull-through-registry
+
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+
+registries:
+  create:
+    name: k3d-docker.io
+    proxy:
+      remoteURL: https://registry-1.docker.io
+      # Authenticate to Docker Hub (increase rate limit to 200 pulls per hour)
+      username: "$DOCKERHUB_USERNAME"
+      password: "$DOCKERHUB_PASSWORD"
+    volumes:
+      - /var/cache/registry/docker-io:/var/lib/registry
+
+  config: |
+    mirrors:
+      # Pull-through cache for Docker Hub
+      "docker.io":
+        endpoint:
+          - http://k3d-docker.io:5000

@@ -35,13 +35,11 @@ if [ "${1:-}" == 'create' ]; then
     fi
 
     # /dev/mapper: https://k3d.io/v5.7.4/faq/faq/#issues-with-btrfs
-    # registry-config: https://k3d.io/v5.8.3/faq/faq/#dockerhub-pull-rate-limit
     k3d cluster create "$CLUSTER_NAME" --wait \
+        --config config/k3d-config-cache.yaml \
         --image "rancher/k3s:$K3S" \
         -s "$MASTER_COUNT" -a "$WORKER_COUNT" \
-        --registry-create "k3d-$CLUSTER_NAME-registry" \
-        --registry-config <(echo "${K3D_REGISTRY_CONFIG:-}") \
-        -v /dev/mapper:/dev/mapper@all \
+        -v "/dev/mapper:/dev/mapper@all:*" \
         ${MTLS:+--k3s-arg '--kube-apiserver-arg=admission-control-config-file=/etc/mtls/admission.yaml@server:*'} \
         ${MTLS:+--volume "$MTLS_DIR:/etc/mtls@server:*"} \
         "${@:2}"
