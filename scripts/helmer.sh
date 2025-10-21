@@ -46,7 +46,8 @@ VERSION=${VERSION:-$( [[ "$CHARTS_LOCATION" == */* ]] && echo "local" || echo "n
 
 # Extra parameters for helm install
 CRDS_ARGS="${CRDS_ARGS:-}"
-CONTROLLER_ARGS="${CONTROLLER_ARGS:-}"
+# Force openreports until it's default
+CONTROLLER_ARGS="--set auditScanner.reportCRDsKind=openreports ${CONTROLLER_ARGS:-}"
 DEFAULTS_ARGS="${DEFAULTS_ARGS:-}"
 # Use latest tag for main images
 if [ -n "${LATEST:-}" ]; then
