@@ -150,16 +150,16 @@ var _ = Describe("E2E - Test full Backup/Restore", Label("test-full-backup-resto
 	var backupFile string
 
 	It("Do a full backup/restore test", func() {
-		By("Creating a privileged pod to trigger a policy report", func() {
+		By("Creating a privileged pod to trigger a report", func() {
 			_, err := kubectl.Run("run", "pod-privileged", "--image=rancher/pause:3.2", "--privileged")
 			Expect(err).To(Not(HaveOccurred()))
 
 			uid, err := kubectl.Run("get", "pod", "pod-privileged", "-o", "jsonpath={.metadata.uid}")
 			Expect(err).To(Not(HaveOccurred()))
 
-			// Wait for a policy report to be generated and make sure we got a failure about the privileged pod
+			// Wait for a report to be generated and make sure we got a failure about the privileged pod
 			Eventually(func() string {
-				out, _ := kubectl.RunWithoutErr("get", "policyreport", uid,
+				out, _ := kubectl.RunWithoutErr("get", "report", uid,
 					"-o", "jsonpath={.summary.fail}")
 				return out
 			}, tools.SetTimeout(5*time.Minute), 10*time.Second).Should(ContainSubstring("1"))
@@ -305,16 +305,16 @@ var _ = Describe("E2E - Test full Backup/Restore", Label("test-full-backup-resto
 			}
 		})
 
-		By("Creating a privileged pod to trigger a policy report", func() {
+		By("Creating a privileged pod to trigger a report", func() {
 			_, err := kubectl.Run("run", "pod-privileged", "--image=rancher/pause:3.2", "--privileged")
 			Expect(err).To(Not(HaveOccurred()))
 
 			uid, err := kubectl.Run("get", "pod", "pod-privileged", "-o", "jsonpath={.metadata.uid}")
 			Expect(err).To(Not(HaveOccurred()))
 
-			// Wait for a policy report to be generated and make sure we got a failure about the privileged pod
+			// Wait for a report to be generated and make sure we got a failure about the privileged pod
 			Eventually(func() string {
-				out, _ := kubectl.RunWithoutErr("get", "policyreport", uid,
+				out, _ := kubectl.RunWithoutErr("get", "report", uid,
 					"-o", "jsonpath={.summary.fail}")
 				return out
 			}, tools.SetTimeout(5*time.Minute), 10*time.Second).Should(ContainSubstring("1"))
