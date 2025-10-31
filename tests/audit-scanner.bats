@@ -14,7 +14,7 @@ get_report() {
     # Find resource UID
     local ruid=$(kubectl get $resource -o jsonpath='{.metadata.uid}')
     # Figure out if resource report is namespaced or not
-    kubectl api-resources --no-headers --namespaced=false | grep -w ${resource%/*} >/dev/null && rtype=cpolr || rtype=polr
+    kubectl api-resources --no-headers --namespaced=false | grep -w ${resource%/*} >/dev/null && rtype=creps || rtype=reps
     # Print resource report
     kubectl get $rtype $ruid -o json | jq -c '.'
 }
