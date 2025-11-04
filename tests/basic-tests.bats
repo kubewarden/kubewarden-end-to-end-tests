@@ -38,18 +38,26 @@ helm_get() {
 
     # Hauler manifest versions for PRs
     if [[ "$CHARTS_LOCATION" == */* ]]; then
+        # Get versions from upstream policy-reporter
+        local polrep_ver polrep_url
+        polrep_ver=$(helm_get kubewarden-controller '.dependencies[] | select(.name=="policy-reporter").version')
+        polrep_url=https://github.com/kyverno/policy-reporter/releases/download/policy-reporter-$polrep_ver/policy-reporter-$polrep_ver.tgz
+
         # Helm Charts
         for chart in kubewarden-crds kubewarden-controller kubewarden-defaults; do
             test "$(haul_get kubewarden-helm-charts $chart)" = "$(helm_get $chart '.version')"
         done
-        test "$(haul_get kubewarden-helm-charts policy-reporter)" = "$(helm_get kubewarden-controller '.dependencies[].version')"
+        test "$(haul_get kubewarden-helm-charts policy-reporter)" = "$polrep_ver"
+        test "$(haul_get kubewarden-helm-charts openreports)" = "$(helm_get kubewarden-crds '.dependencies[] | select(.name=="openreports").version')"
+
         # Signed images
         test "$(haul_get kubewarden-container-images kubewarden-controller)" = "$(helm_get kubewarden-controller '.image.tag')"
         test "$(haul_get kubewarden-container-images audit-scanner)" = "$(helm_get kubewarden-controller '.auditScanner.image.tag')"
         test "$(haul_get kubewarden-container-images policy-server)" = "$(helm_get kubewarden-defaults '.policyServer.image.tag')"
+
         # Unsigned images
-        test "$(haul_get kubewarden-not-signed-images policy-reporter)" = "$(helm_get kubewarden-controller '.policy-reporter.image.tag')"
-        test "$(haul_get kubewarden-not-signed-images policy-reporter-ui)" = "$(helm_get kubewarden-controller '.policy-reporter.ui.image.tag')"
+        test "$(haul_get kubewarden-not-signed-images policy-reporter)" = "$(helm show chart $polrep_url | yq -e '.appVersion')"
+        test "$(haul_get kubewarden-not-signed-images policy-reporter-ui)" = "$(helm show values $polrep_url | yq -e '.ui.image.tag')"
         test "$(haul_get kubewarden-not-signed-images kuberlr-kubectl)" = "$(helm_get kubewarden-controller '.preDeleteJob.image.tag')"
         # Policies
         for policy in allow-privilege-escalation-psp capabilities-psp host-namespaces-psp hostpaths-psp pod-privileged user-group-psp; do
