@@ -112,6 +112,7 @@ func InstallBackupOperator(k *kubectl.Kubectl) {
 			"--namespace", "cattle-resources-system",
 			"--create-namespace",
 			"--wait", "--wait-for-jobs",
+			"--devel",
 		}
 
 		// Add specific options for the rancher-backup chart
