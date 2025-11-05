@@ -21,18 +21,18 @@ teardown_file() {
     helm uninstall --wait -n open-telemetry my-opentelemetry-operator
     helm uninstall --wait -n cert-manager cert-manager
 
-    helmer reset controller
+    helmer reset kubewarden-controller
     helmer reset kubewarden-defaults
 }
 
 # get_metrics policy-server-default
 function get_metrics {
-    pod=$1
-    ns=${2:-$NAMESPACE}
+    local svc=$1
+    is_appco && svc=${1/#kubewarden-controller/ssac-&}
 
     kubectl delete pod curlpod --ignore-not-found
-    kubectl run curlpod -t -i --rm --image curlimages/curl:8.10.1 --restart=Never -- \
-        --silent $pod.$ns.svc.cluster.local:8080/metrics
+    kubectl run curlpod -t -i --rm --image curlimages/curl:8.17.0 --restart=Never -- \
+        --silent $svc.$NAMESPACE.svc.cluster.local:8080/metrics
 }
 export -f get_metrics # required by retry command
 
@@ -82,9 +82,9 @@ export -f get_metrics # required by retry command
     retry "kubectl get pods -n $NAMESPACE -l 'app.kubernetes.io/component in (controller,policy-server)' -o json \
         | jq -e 'all(.items[]; (.spec.initContainers[]?, .spec.containers[]) | select(.name == \"otc-container\"))'"
     # Policy server service has the metrics ports
-    kubectl get services -n $NAMESPACE  policy-server-default -o json | jq -e '[.spec.ports[].name == "metrics"] | any'
+    kubectl get services -n $NAMESPACE  policy-server-default -o json | jq -e 'any(.spec.ports[]; .name == "metrics")'
     # Controller service has the metrics ports
-    kubectl get services -n $NAMESPACE kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name == "metrics"] | any'
+    kubectl get services -n $NAMESPACE -l app.kubernetes.io/name=kubewarden-controller -o json | jq -e 'any(.items[].spec.ports[]; .name == "metrics")'
 
     # Generate metric data
     kubectl run pod-privileged --image=rancher/pause:3.2 --privileged
@@ -127,9 +127,9 @@ export -f get_metrics # required by retry command
     retry "kubectl get pods -n $NAMESPACE -o json \
         | jq -e 'all(.items[]; (.spec.initContainers + .spec.containers | map(.name) | contains([\"otc-container\"]) | not))'"
     # Policy server service has no metrics ports
-    kubectl get services -n $NAMESPACE policy-server-default -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
+    kubectl get services -n $NAMESPACE policy-server-default -o json | jq -e 'all(.spec.ports[]; .name != "metrics")'
     # Controller service has no metrics ports
-    kubectl get services -n $NAMESPACE kubewarden-controller-metrics-service -o json | jq -e '[.spec.ports[].name != "metrics"] | all'
+    kubectl get services -n $NAMESPACE -l app.kubernetes.io/name=kubewarden-controller -o json | jq -e 'all(.items[].spec.ports[]; .name != "metrics")'
 }
 
 @test "[OpenTelemetry Remote collector] Setup remote Otel collector" {

@@ -123,7 +123,11 @@ function wait_policies {
 function create_policyserver {
     local name="${1:-pserver}"
     local image
-    image="ghcr.io/$(helm get values -a kubewarden-defaults -n kubewarden -o json | jq -er '.policyServer.image | .repository + ":"+ .tag')"
+    if is_appco; then
+        image="dp.apps.rancher.io/containers/kubewarden-policy-server:$(helm get values -a -n kubewarden ssac -o json | jq -er '."kubewarden-defaults".policyServer.image.tag')"
+    else
+        image="ghcr.io/$(helm get values -a kubewarden-defaults -n kubewarden -o json | jq -er '.policyServer.image | .repository + ":"+ .tag')"
+    fi
     kubectl apply -f - <<EOF
 apiVersion: policies.kubewarden.io/v1
 kind: PolicyServer

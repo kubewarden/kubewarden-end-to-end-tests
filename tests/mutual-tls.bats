@@ -12,7 +12,7 @@ teardown_file() {
     helmer reset kubewarden-controller
 }
 
-function curlpod { kubectl exec curlpod -- curl -k --no-progress-meter $@; }
+function curlpod { kubectl exec curlpod -- curl -k --no-progress-meter "$@"; }
 
 function check_service_mtls {
     local url=$1

@@ -28,14 +28,15 @@ export NAMESPACE OTEL_OPERATOR
 #   REPO_NAME=[kubewarden]
 #   CHARTS_LOCATION=[./dirname|reponame]
 #   LATEST=[1]
-#   CRDS_ARGS, DEFAULTS_ARGS, CONTROLLER_ARGS
+#   APPCO=[1|<version>]
+#   CRDS_ARGS, DEFAULTS_ARGS, CONTROLLER_ARGS APPCO_ARGS
 
 # ==================================================================================================
 # Github boolean "false" is interpreted as a string (true) by bash
 # Github falsy values (false, 0, -0, "", '', null) are coerced to false
 
 # Boolean variables from github workflow
-VARIABLES = MTLS LATEST UPGRADE
+VARIABLES = MTLS LATEST UPGRADE APPCO
 
 define is_falsy
 $(filter false 0 -0 "" '' null,$($(1)))

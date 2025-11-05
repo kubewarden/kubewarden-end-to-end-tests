@@ -109,7 +109,9 @@ is_version() {
 }
 
 # Query against installed kubewarden app version
-kw_version() { is_version "$1" "$(helm ls -n "$NAMESPACE" -f kubewarden-crds -o json | jq -r '.[0].app_version')"; }
+kw_version() { is_version "$1" "$(helm ls -n "$NAMESPACE" -f 'kubewarden-crds|ssac' -o json | jq -r '.[0].app_version')"; }
+
+is_appco() { [ -n "${APPCO:-}" ] || helm status -n $NAMESPACE ssac &>/dev/null; }
 
 # ==================================================================================================
 # Others
@@ -189,6 +191,11 @@ precheck() {
             if kubectl get cap &>/dev/null; then
                 error "Kubewarden already exists!"
                 helm ls -n $NAMESPACE -o json | jq -r '"Kubewarden: \(.[0].app_version)", (.[].chart | " - " + .)'
+                return 1
+            fi
+            # Fail if AppCo credentials are missing
+            if is_appco && [[ -z "${APPCO_ID:-}" || -z "${APPCO_PW:-}" ]]; then
+                error "AppCo requires APPCO_ID & APPCO_PW env!"
                 return 1
             fi
         ;;

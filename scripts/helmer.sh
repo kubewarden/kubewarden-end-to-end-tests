@@ -25,6 +25,9 @@ trap 'echo "Error on ${BASH_SOURCE/$PWD/.}:${LINENO} $(sed -n "${LINENO} s/^\s*/
 # Reset helm chart values to initial state
 # ./helmer reset controller
 
+# Install from Application Collection
+# APPCO=1 ./helmer install
+
 # ==================================================================================================
 # Global variables & Checks - Used only in install & upgrade actions
 
@@ -36,6 +39,8 @@ NAMESPACE=${NAMESPACE:-kubewarden}
 REPO_NAME=${REPO_NAME:-kubewarden}
 # Use charts from [./dirname|reponame]
 CHARTS_LOCATION=${CHARTS_LOCATION:-$REPO_NAME}
+# Install from Application Collection
+APPCO="${APPCO:-}"
 
 # [next|prev|v1.17.0-rc2|local] - defaults to local if CHARTS_LOCATION is path, otherwise next
 # - next: last version from helm search kubewarden --devel
@@ -57,6 +62,8 @@ fi
 if [ -n "${MTLS:-}" ]; then
     CONTROLLER_ARGS="--set mTLS.enable=true --set mTLS.configMapName=mtlscm $CONTROLLER_ARGS"
 fi
+# Application Collection defaults
+APPCO_ARGS="--set global.imagePullSecrets[0]=application-collection ${APPCO_ARGS:-}"
 
 # Prepend "v" and append .0 to partial versions
 [[ $VERSION =~ ^[1-9] ]] && VERSION="v$VERSION"
@@ -70,7 +77,7 @@ fi
 [ $# -gt 1 ] && set -- "$1" "${2/#kubewarden-}" "${@:3}"
 
 # Second parameter must be short chart name or empty
-[[ ${2:-} =~ ^(crds|controller|defaults)?$ ]] || { echo "Bad chart: $2"; exit 1; }
+[[ ${2:-} =~ ^(crds|controller|defaults|--.+)?$ ]] || { echo "Bad chart: $2"; exit 1; }
 
 # Directory of the current script
 BASEDIR=$(dirname "${BASH_SOURCE[0]}")
@@ -80,7 +87,7 @@ BASEDIR=$(dirname "${BASH_SOURCE[0]}")
 
 . "$BASEDIR/../helpers/kubelib.sh"
 
-print_env() {
+save_env() {
     # Main parameters
     echo NAMESPACE=\""$NAMESPACE"\"
     echo REPO_NAME=\""$REPO_NAME"\"
@@ -94,7 +101,13 @@ print_env() {
     for key in "${!vMap[@]}"; do
         echo vMap["$key"]=\""${vMap[$key]}"\"
     done
-}
+    # Application Collection
+    if [ -n "${APPCO:-}" ]; then
+        echo APPCO=\""$APPCO"\"
+        echo APPCO_ARGS=\""$APPCO_ARGS"\"
+        echo SSAC_ARGS=\""$SSAC_ARGS"\"
+    fi
+} > /tmp/helmer.env
 
 load_env() { source /tmp/helmer.env; }
 
@@ -131,16 +144,63 @@ make_version_map() {
     done
     rm "$tempfile"
 
-    # Save initial settings
-    print_env > /tmp/helmer.env
+    if is_appco; then
+        [[ $APPCO =~ [0-9]+\.[0-9]+\.[0-9]+ ]] \
+            && vMap["ssac"]=$APPCO \
+            || vMap["ssac"]=$(curl -s https://apps.rancher.io/api/components/suse-security-admission-controller \
+                | jq -er --arg v "${VERSION#v}" '[.branches[].versions[] | select(.artifacts != [])] |
+                    if   $v == "next" then .[0]
+                    elif $v == "prev" then .[1]
+                    else .[] | select(.version_number == $v)
+                    end | .artifacts[0].version')
+    fi
+
+    return 0
 }
 
 print_version_map() {
     local out
-    for k in app crds controller defaults; do
-        out+="$k:${vMap[$k]} "
+    for k in app crds controller defaults ssac; do
+        [[ -v vMap[$k] ]] && out+="$k:${vMap[$k]} "
     done
     echo -n "${out% }" # Remove trailing space
+}
+
+# release_name_v0() { is_appco && echo ssac || echo "$@"; }
+# Override release name for appco & handle kubewarden- prefix
+release_name() {
+    local out=()
+    if is_appco; then echo ssac; else
+        for p; do out+=("kubewarden-${p#kubewarden-}"); done
+        echo "${out[@]}"
+    fi
+}
+
+# Get currently installed release version
+release_version() { helm get metadata -n "$NAMESPACE" "$(release_name $1)" -o json | jq -er '.version'; }
+
+# Modifies helm parameters for appco chart
+# Usage: appco_values chart_name [--set key=value ...]
+# Output: --set key=value -> --set kubewarden-defaults.key=value
+appco_values() {
+    local p="$1"; shift
+    local tempfile args=()
+    while (($#)); do
+        case $1 in
+            --set|--set-file)
+                args+=("$1" "$p.$2")
+                shift 2;;
+            --values)
+                tempfile=$(mktemp -p "${BATS_TEST_TMPDIR:-/tmp}" values-XXX.yaml)
+                p=$p yq '. as $root | {env(p): $root}' "$2" > "$tempfile"
+                args+=("$1" "$tempfile")
+                shift 2;;
+            *)
+                args+=("$1")
+                shift;;
+        esac
+    done
+    printf '%s\0' "${args[@]}"
 }
 
 # ==================================================================================================
@@ -148,8 +208,16 @@ print_version_map() {
 
 # Usage: helm_up kubewarden-crds [--params ..]
 helm_up() {
-    echo helm_up ... -n "$NAMESPACE" "${@:2}" "$1" "$CHARTS_LOCATION/$1"
-    helm upgrade -i --wait --wait-for-jobs -n "$NAMESPACE" "${@:2}" "$1" "$CHARTS_LOCATION/$1"
+    local name chart
+    name=$(release_name "$1")
+    chart="$CHARTS_LOCATION/$1"
+
+    if is_appco; then
+        chart="oci://dp.apps.rancher.io/charts/suse-security-admission-controller"
+    fi
+
+    echo helm_up "$name" "$chart" "${@:2}"
+    helm upgrade "$name" "$chart" -n "$NAMESPACE" -i --wait --wait-for-jobs "${@:2}"
 }
 
 # Required configuration before install / upgrade
@@ -173,13 +241,12 @@ setup_requirements() {
 }
 
 # Install selected $VERSION
-do_install() {
+do_install_basic() {
     echo "Install $VERSION: ($(print_version_map))"
 
     local argsvar
     for chart in ${1:-crds controller defaults}; do
         argsvar=${chart^^}_ARGS
-        # shellcheck disable=SC2086
         helm_up "kubewarden-$chart" --version "${vMap[$chart]}" ${!argsvar} "${@:2}"
     done
 
@@ -190,6 +257,30 @@ do_install() {
     fi
 
     return 0
+}
+
+# Requires APPCO_ID & APPCO_PW env
+do_install_appco() {
+    local version=${vMap[ssac]}
+
+    kubectl get secret application-collection -n "$NAMESPACE" &>/dev/null || \
+        kubectl create secret docker-registry application-collection -n "$NAMESPACE" \
+            --docker-server=dp.apps.rancher.io \
+            --docker-username=$APPCO_ID \
+            --docker-password=$APPCO_PW
+
+    helm registry login dp.apps.rancher.io -u $APPCO_ID -p $APPCO_PW
+
+    # Install main chart
+    local -a args
+    [[ $# -gt 0 ]] && readarray -d '' args < <(appco_values "kubewarden-$1" "${@:2}")
+    helm_up ssac --version $version $SSAC_ARGS "${args[@]}"
+    # Install policy-server
+    kubectl -n "$NAMESPACE" wait --for=condition=Ready pod --selector app.kubernetes.io/instance=ssac
+    helm -n "$NAMESPACE" upgrade ssac oci://dp.apps.rancher.io/charts/suse-security-admission-controller --reuse-values --version $version
+
+    sleep 10 # Wait for reconciliation
+    wait_rollout deployment/policy-server-default
 }
 
 # Install on Rancher
@@ -262,67 +353,102 @@ do_install_on_rancher() {
 do_upgrade() {
     echo "Upgrade to $VERSION:($(print_version_map))"
 
-    local argsvar
-    for chart in ${1:-crds controller defaults}; do
-        argsvar=${chart^^}_ARGS
-        # Look into --reset-then-reuse-values helm flag as replacement
-        helm get values "kubewarden-$chart" -n "$NAMESPACE" -o yaml > /tmp/chart-values.yaml
-        # shellcheck disable=SC2086
-        helm_up "kubewarden-$chart" --version "${vMap[$chart]}" --values /tmp/chart-values.yaml ${!argsvar} "${@:2}"
+    local rel_short argsvar
+    local releases=${*:-kubewarden-crds kubewarden-controller kubewarden-defaults}
 
-        if [ "$chart" = 'controller' ]; then
-            [[ "${vMap[$chart]}" == 4.1* ]] && continue # Url renamed to Module in PS ConfigMap
-            [[ "${vMap[$chart]}" == 5.0* ]] && continue # Probe port change from https to http
+    for rel in $(release_name $releases); do
+        rel_short=${rel#kubewarden-}
+        argsvar=${rel_short^^}_ARGS
+
+        # Look into --reset-then-reuse-values helm flag as replacement
+        helm get values "$rel" -n "$NAMESPACE" -o yaml > /tmp/rel-values.yaml
+        helm_up "$rel" --version "${vMap[$rel_short]}" --values /tmp/rel-values.yaml ${!argsvar} "${@:2}"
+
+        if [[ "$rel_short" == 'controller' ]]; then
+            [[ "${vMap[$rel_short]}" == 4.1* ]] && continue # Url renamed to Module in PS ConfigMap
+            [[ "${vMap[$rel_short]}" == 5.0* ]] && continue # Probe port change from https to http
             sleep 20 # Wait for reconciliation
             wait_rollout deployment/policy-server-default
         fi
     done
-    [ "${1:-defaults}" == 'defaults' ] && wait_rollout deployment/policy-server-default
+    [[ "${1:-defaults}" =~ (defaults|ssac) ]] && wait_rollout deployment/policy-server-default
 
     return 0
 }
 
 do_uninstall() {
-    echo "Uninstall kubewarden: ${1:-charts}"
-    for chart in ${1:-defaults controller crds}; do
-        helm uninstall --wait --namespace "$NAMESPACE" "kubewarden-$chart" "${@:2}"
-    done
+    # Skip follow-up request for appco (helm un defaults; helm un controller -> helm un ssac)
+    [ -n "${APPCO:-}" ] && ! helm status -n "$NAMESPACE" ssac &>/dev/null && return 0
+
+    local names=${*/#-*}
+    local flags=${*/#[!-]*}
+    names=$(release_name ${names:-kubewarden-defaults kubewarden-controller kubewarden-crds})
+
+    echo "Uninstall: $names $flags"
+    helm uninstall $names -n "$NAMESPACE" --wait $flags
 }
 
 # Modify installed chart values & keep version
 do_set() {
-    local chart="$1"
+    local release version
+    release="kubewarden-$1"
 
-    local ver
-    ver=$(helm get metadata "kubewarden-$chart" -n "$NAMESPACE" -o json | jq -er '.version')
-    helm_up "kubewarden-$chart" --version "$ver" --reuse-values "${@:2}"
+    local -a args=("${@:2}")
+    is_appco && readarray -d '' args < <(appco_values $release "${args[@]}")
+
+    version=$(release_version "$release")
+    helm_up "$release" --version "$version" --reuse-values "${args[@]}"
 
     [[ "$1" == 'controller' ]] && sleep 20 # Wait for reconciliation
-    [[ "$1" =~ (controller|defaults) ]] && wait_rollout deployment/policy-server-default
+    [[ "$1" =~ (controller|default|ssac) ]] && wait_rollout deployment/policy-server-default
     return 0
 }
 
 do_reset() {
-    local chart="$1"
-    local argsvar=${chart^^}_ARGS
+    local release version
+    release=$(release_name "$1")
+    version=$(release_version "$release")
 
-    local ver
-    ver=$(helm get metadata "kubewarden-$chart" -n "$NAMESPACE" -o json | jq -er '.version')
-    # shellcheck disable=SC2086
-    helm_up "kubewarden-$chart" --version "$ver" --reset-values ${!argsvar} "${@:2}"
+    local rel_short=${release#kubewarden-}
+    local argsvar=${rel_short^^}_ARGS
+
+    helm_up "$release" --version "$version" --reset-values ${!argsvar} "${@:2}"
 
     # Wait for pods to be ready
-    [ "$1" = 'defaults' ] && wait_rollout deployment/policy-server-default
+    [[ "$rel_short" =~ (defaults|ssac) ]] && wait_rollout deployment/policy-server-default
     return 0
 }
 
 # ==================================================================================================
 # Main script
 
+# Install and reinstall handler
+do_install() {
+    if [ -n "${APPCO:-}" ]; then
+        # Only reinstall if needed or extra arguments are set
+        if ! helm status -n "$NAMESPACE" ssac &>/dev/null || [[ "$*" == *--* ]]; then
+            do_install_appco "$@"
+        fi
+    elif [ -n "${RANCHER:-}" ]; then
+        do_install_on_rancher "$@"
+    else
+        do_install_basic "$@"
+    fi
+}
+
 case $1 in
+    in|install)
+        # Transform args for appco chart
+        if [ -n "${APPCO:-}" ]; then
+            CRDS_ARGS=${CRDS_ARGS//--set /--set kubewarden-crds.}
+            CONTROLLER_ARGS=${CONTROLLER_ARGS//--set /--set kubewarden-controller.}
+            DEFAULTS_ARGS=${DEFAULTS_ARGS//--set /--set kubewarden-defaults.}
+            SSAC_ARGS="$APPCO_ARGS $CRDS_ARGS $CONTROLLER_ARGS $DEFAULTS_ARGS"
+        fi ;;&
     # Build version map of charts
     in|install|up|upgrade|versions)
-        make_version_map;;&
+        make_version_map
+        save_env;;&
     reinstall|uninstall|set|reset)
         load_env;;&
 
@@ -335,7 +461,7 @@ case $1 in
     in|install)
         [ -v DRY ] && { echo "Install $VERSION: ($(print_version_map))"; exit 0; }
         precheck kubewarden || exit 1
-        do_install${RANCHER:+_on_rancher} "${@:2}";;
+        do_install "${@:2}";;
     up|upgrade) do_upgrade "${@:2}";;
     reinstall)  do_install "${@:2}";;
     uninstall)  do_uninstall "${@:2}";;
