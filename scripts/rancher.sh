@@ -52,8 +52,8 @@ helm_add_repositories() {
     ar() { helm repo ls | grep -q "^$1[[:space:]]" || helm repo add "$1" "$2"; }
     ar e2e-jetstack https://charts.jetstack.io
     ar e2e-rancher-prime https://charts.rancher.com/server-charts/prime
-    ar e2e-rancher-primerc https://charts.optimus.rancher.io/server-charts/latest
-    ar e2e-rancher-primealpha https://charts.optimus.rancher.io/server-charts/alpha
+    ar e2e-rancher-primerc https://charts.rancher.com/server-charts/rc
+    ar e2e-rancher-primealpha https://charts.rancher.com/server-charts/alpha
     ar e2e-rancher-community https://releases.rancher.com/server-charts/latest
     ar e2e-rancher-communityalpha https://releases.rancher.com/server-charts/alpha
     helm repo update e2e-rancher-prime e2e-rancher-primerc e2e-rancher-primealpha e2e-rancher-community e2e-rancher-communityalpha e2e-jetstack > /dev/null
