@@ -31,12 +31,12 @@ jobs:
           helm repo add kubewarden https://charts.kubewarden.io
 
       - name: Checkout tested code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           submodules: "true"
 
       - name: Checkout Helm Charts
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: kubewarden/helm-charts
           sparse-checkout: charts
