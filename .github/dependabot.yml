@@ -11,3 +11,8 @@ updates:
   schedule:
     interval: "weekly"
     day: "monday"
+- package-ecosystem: "gomod"
+  directory: "/tests/ginkgo-e2e"
+  schedule:
+    interval: "weekly"
+    day: "monday"
