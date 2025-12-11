@@ -108,7 +108,7 @@ make_version_map() {
 
     if [ "$VERSION" != local ]; then
         # Do single helm search query to speed up the process
-        helm repo update "$REPO_NAME" --fail-on-repo-update-fail >/dev/null
+        helm repo update "$REPO_NAME" >/dev/null
         helm search repo --fail-on-no-result "$REPO_NAME/kubewarden-" --versions --devel -o json \
             | jq -ec --arg v "$VERSION" '
                 def remap(items): items | unique_by(.name) | map({(.name): .version, app_version: .app_version}) | add;
