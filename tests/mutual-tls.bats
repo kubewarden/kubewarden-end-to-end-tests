@@ -31,7 +31,7 @@ function check_service_mtls {
     create_policyserver mtls-pserver
 
     # Set up pod with certificates for curl
-    kubectl run curlpod --image=nginx:alpine
+    kubectl run curlpod --image=nginx:1.29.3-alpine
     wait_for pod curlpod
     kubectl cp resources/mtls curlpod:/mtls
 }
