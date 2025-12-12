@@ -34,12 +34,16 @@ if [ "${1:-}" == 'create' ]; then
         generate_certs "$MTLS_DIR" mtls.kubewarden.io
     fi
 
+    # Detect pull-through cache for GHCR
+    k3d registry list k3d-ghcr.io --no-headers 2>/dev/null && PTC_GHCR="k3d-ghcr.io"
+
     # /dev/mapper: https://k3d.io/v5.7.4/faq/faq/#issues-with-btrfs
     k3d cluster create "$CLUSTER_NAME" --wait \
         --config config/k3d-config-cache.yaml \
         --image "rancher/k3s:$K3S" \
         -s "$MASTER_COUNT" -a "$WORKER_COUNT" \
         -v "/dev/mapper:/dev/mapper@all:*" \
+        ${PTC_GHCR:+--registry-use $PTC_GHCR} \
         ${MTLS:+--k3s-arg '--kube-apiserver-arg=admission-control-config-file=/etc/mtls/admission.yaml@server:*'} \
         ${MTLS:+--volume "$MTLS_DIR:/etc/mtls@server:*"} \
         "${@:2}"

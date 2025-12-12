@@ -1,0 +1,23 @@
+# Configure SUSE CA to allow pulls from registry.suse.de
+# Usage: k3d cluster create ... --config config/k3d-config-registry.suse.de.yaml
+
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+
+# SUSE_Trust_Root from ca-certificates-suse package
+volumes:
+  - volume: $PWD/SUSE_Trust_Root.crt.pem:/etc/ssl/certs/SUSE_Trust_Root.crt.pem
+    nodeFilters:
+      - all:*
+
+registries:
+  config: |
+    mirrors:
+      "registry.suse.de":
+        endpoint:
+          - https://registry.suse.de/v2
+    configs:
+      "registry.suse.de":
+        tls:
+          # Alternative: insecure_skip_verify: true
+          ca_file: /etc/ssl/certs/SUSE_Trust_Root.crt.pem
