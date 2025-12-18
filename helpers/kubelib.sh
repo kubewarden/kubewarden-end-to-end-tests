@@ -155,10 +155,12 @@ precheck() {
 
     # https://gitlab.suse.de/OPS-Service/salt/-/merge_requests/5326
     if grep -Ewi '^search.*\s+suse.de' /etc/resolv.conf; then
-        error "Search suse.de will trigger ndots issue"
-        read -p "Remove suse.de from resolv.conf? [Y/N] " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if [ ! -v CI ]; then
+            warn "Search suse.de will trigger ndots issue"
+            read -p "Remove suse.de from resolv.conf? [Y/N] " -n 1 -r
+            echo
+        fi
+        if [[ -v CI || $REPLY =~ ^[Yy]$ ]]; then
             sudo sed -Ei '/^search/ s/\s+suse.de//' /etc/resolv.conf
         else
             return 1
