@@ -205,6 +205,17 @@ var _ = Describe("E2E - Deploy K3S/Rancher in airgap environment", Label("airgap
 				"--wait", "--wait-for-jobs",
 				"--devel",
 			}
+			// Add policy versions only if not upgrade test
+			if testType != "upgrade" {
+				flags = append(flags,
+					"--set", "recommendedPolicies.allowPrivilegeEscalationPolicy.module.tag="+allowPrivilegeEscalationPolicyVersion,
+					"--set", "recommendedPolicies.hostNamespacePolicy.module.tag="+hostNamespacePolicyVersion,
+					"--set", "recommendedPolicies.podPrivilegedPolicy.module.tag="+podPrivilegedPolicyVersion,
+					"--set", "recommendedPolicies.userGroupPolicy.module.tag="+userGroupPolicyVersion,
+					"--set", "recommendedPolicies.hostPathsPolicy.module.tag="+hostPathsPolicyVersion,
+					"--set", "recommendedPolicies.capabilitiesPolicy.module.tag="+capabilitiesPolicyVersion,
+				)
+			}
 			RunHelmCmdWithRetry(flags...)
 
 			// Wait for pod to be started
