@@ -8,7 +8,7 @@ NAMESPACE ?= $(shell helm status -n cattle-system rancher >/dev/null 2>&1 && ech
 CLUSTER_CONTEXT ?= $(shell kubectl config current-context)
 
 # Should match version in https://docs.kubewarden.io/reference/dependency-matrix
-OTEL_OPERATOR := $(or $(OTEL_OPERATOR),0.97.1)
+OTEL_OPERATOR := $(or $(OTEL_OPERATOR),0.102.0)
 
 export NAMESPACE OTEL_OPERATOR
 
