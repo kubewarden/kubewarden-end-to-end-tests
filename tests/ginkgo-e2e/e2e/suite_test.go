@@ -45,14 +45,20 @@ const (
 )
 
 var (
-	auditScannerVersion         string
-	backupRestoreVersion        string
-	kubewardenControllerVersion string
-	policyServerVersion         string
-	k3sVersion                  string
-	netDefaultFileName          string
-	rancherHostname             string
-	testType                    string
+	allowPrivilegeEscalationPolicyVersion string
+	auditScannerVersion                   string
+	backupRestoreVersion                  string
+	capabilitiesPolicyVersion             string
+	hostNamespacePolicyVersion            string
+	hostPathsPolicyVersion                string
+	kubewardenControllerVersion           string
+	k3sVersion                            string
+	podPrivilegedPolicyVersion            string
+	policyServerVersion                   string
+	netDefaultFileName                    string
+	rancherHostname                       string
+	testType                              string
+	userGroupPolicyVersion                string
 )
 
 func CheckBackupRestore(v string) {
@@ -278,6 +284,12 @@ func TestE2E(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	auditScannerVersion = os.Getenv("AUDIT_SCANNER_VERSION")
+	allowPrivilegeEscalationPolicyVersion = os.Getenv("ALLOW_PRIVILEGE_ESCALATION_PSP_VERSION")
+	capabilitiesPolicyVersion = os.Getenv("CAPABILITIES_PSP_VERSION")
+	hostNamespacePolicyVersion = os.Getenv("HOST_NAMESPACES_PSP_VERSION")
+	hostPathsPolicyVersion = os.Getenv("HOSTPATHS_PSP_VERSION")
+	podPrivilegedPolicyVersion = os.Getenv("POD_PRIVILEGED_PSP_VERSION")
+	userGroupPolicyVersion = os.Getenv("USER_GROUP_PSP_VERSION")
 	backupRestoreVersion = os.Getenv("BACKUP_RESTORE_VERSION")
 	kubewardenControllerVersion = os.Getenv("KUBEWARDEN_CONTROLLER_VERSION")
 	policyServerVersion = os.Getenv("POLICY_SERVER_VERSION")

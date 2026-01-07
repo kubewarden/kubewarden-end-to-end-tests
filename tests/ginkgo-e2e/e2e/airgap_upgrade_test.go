@@ -135,6 +135,12 @@ var _ = Describe("E2E - Upgrade Kubewarden in airgap environment", Label("airgap
 				"--set", "policyServer.image.tag=" + policyServerVersion,
 				"--set", "recommendedPolicies.enabled=true",
 				"--set", "recommendedPolicies.defaultPoliciesRegistry=" + repoServer,
+				"--set", "recommendedPolicies.allowPrivilegeEscalationPolicy.module.tag=" + allowPrivilegeEscalationPolicyVersion,
+				"--set", "recommendedPolicies.hostNamespacePolicy.module.tag=" + hostNamespacePolicyVersion,
+				"--set", "recommendedPolicies.podPrivilegedPolicy.module.tag=" + podPrivilegedPolicyVersion,
+				"--set", "recommendedPolicies.userGroupPolicy.module.tag=" + userGroupPolicyVersion,
+				"--set", "recommendedPolicies.hostPathsPolicy.module.tag=" + hostPathsPolicyVersion,
+				"--set", "recommendedPolicies.capabilitiesPolicy.module.tag=" + capabilitiesPolicyVersion,
 				"--wait", "--wait-for-jobs",
 				"--devel",
 			}
