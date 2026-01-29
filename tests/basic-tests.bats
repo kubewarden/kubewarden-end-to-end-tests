@@ -35,6 +35,9 @@ helm_get() {
 @test "$(tfile) Version checks" {
     # Helm app version is consistent
     helm list -n "$NAMESPACE" -o json | jq 'map(.app_version) | unique | length == 1'
+    # Check auto-install annotation
+    test "$(helm_get kubewarden-controller '.annotations["catalog.cattle.io/auto-install"] | split("=")[1]')" = "$(helm_get kubewarden-crds '.version')"
+    test "$(helm_get kubewarden-defaults '.annotations["catalog.cattle.io/auto-install"] | split("=")[1]')" = "$(helm_get kubewarden-crds '.version')"
 
     # Hauler manifest versions for PRs
     if [[ "$CHARTS_LOCATION" == */* ]]; then
