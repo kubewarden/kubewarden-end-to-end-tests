@@ -28,7 +28,7 @@ haul_get() {
 # Get versions from helm charts
 # Usage: helm_get chart-name [yq-query]
 helm_get() {
-    local chart=$CHARTS_LOCATION/$1
+    local chart=${CHARTS_LOCATION:-kubewarden}/$1
     yq -e "${2:-.}" <(helm show values "$chart"; helm show chart "$chart")
 }
 
