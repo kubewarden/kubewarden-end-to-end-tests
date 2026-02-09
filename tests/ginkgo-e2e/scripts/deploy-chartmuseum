@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# This script deploys a local helm repo to host next kubewarden charts
+# because they are not yet published to the public helm repo.
+# It also updates the hauler manifest to point to the new repo.
+
+set -evx
+
+# Variables
+HAULER_MANIFEST="hauler_manifest.yaml"
+REPO_URL="http://localhost:8080"
+
+# Add missing PATH, removed in recent distributions for security reasons...
+PATH+=:/usr/local/bin
+
+# Install yq if needed
+which yq || sudo zypper --no-refresh -n in yq
+
+# Deploy chartmuseum
+docker run -d \
+  --user root \
+  -p 8080:8080 \
+  -e STORAGE=local \
+  -e STORAGE_LOCAL_ROOTDIR=/charts \
+  -v $(pwd)/charts:/charts \
+  ghcr.io/helm/chartmuseum:v0.14.0
+
+# Download and install helm-push plugin
+helm plugin install https://github.com/chartmuseum/helm-push.git --version 0.10.4
+
+# Create a local helm repo
+helm repo add chartmuseum http://localhost:8080
+
+# Push helm charts to local repo
+cd ../../../charts
+helm cm-push kubewarden-crds chartmuseum
+helm cm-push kubewarden-controller chartmuseum
+helm cm-push kubewarden-defaults chartmuseum
+
+# Update the hauler manifest with the new repo
+for chart in kubewarden-crds kubewarden-controller kubewarden-defaults; do
+  yq -i '
+    (.spec.charts[] | select(.name == "'"$chart"'").repoURL) = "'"$REPO_URL"'"
+  ' $HAULER_MANIFEST
+done
