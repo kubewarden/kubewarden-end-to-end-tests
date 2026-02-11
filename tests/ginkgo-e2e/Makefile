@@ -21,6 +21,9 @@ e2e-full-backup-restore: deps
 e2e-install-backup-restore: deps
 	ginkgo --label-filter install-backup-restore -r -v ./e2e
 
+e2e-install-chartmuseum:
+	./scripts/deploy-chartmuseum
+
 e2e-install-kubewarden: deps
 	ginkgo --label-filter install-kubewarden -r -v ./e2e
 
