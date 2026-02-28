@@ -28,6 +28,7 @@ EXCLUDE_PATTERN="hotfix|debug|patch"
 
 # Directory of the current script
 BASEDIR=$(dirname "${BASH_SOURCE[0]}")
+CONFDIR=$BASEDIR/../config
 
 # ==================================================================================================
 # Helper functions
@@ -161,8 +162,13 @@ RANCHER_FQDN=${RANCHER_FQDN:-$(kubectl get svc traefik -n kube-system -o jsonpat
 
 [ -v DRY ] && exit 0
 
-# Install cert-manager
+# Install cert-manager, required for Rancher default TLS
 helm install --wait cert-manager e2e-jetstack/cert-manager -n cert-manager --create-namespace --set crds.enabled=true
+
+# Create TLS secret for Rancher
+kubectl create ns cattle-system
+kubectl -n cattle-system create secret generic tls-ca --from-file=cacerts.pem=$CONFDIR/rancher-ssl/localCA.crt
+kubectl -n cattle-system create secret tls tls-rancher-ingress --cert=$CONFDIR/rancher-ssl/rancher.crt --key=$CONFDIR/rancher-ssl/rancher.key
 
 # Install Rancher
 helm search repo "$CHART_REPO" --version "$CHART_VER"
@@ -171,6 +177,7 @@ helm install rancher "$CHART_REPO" --version "$CHART_VER" \
     --set hostname="$RANCHER_FQDN" \
     --set bootstrapPassword=sa \
     --wait --timeout=10m \
+    --set ingress.tls.source=secret --set privateCA=true \
     --set replicas=1 \
     ${stgregistry:+--set rancherImage=stgregistry.suse.com/rancher/rancher} \
     ${stgregistry:+--set extraEnv[0].name=CATTLE_AGENT_IMAGE} \
