@@ -6,6 +6,7 @@ setup() {
 teardown_file() {
     teardown_helper
     kubectl delete ns shouldbeignored --ignore-not-found
+    helmer reset kubewarden-controller
     helmer reset kubewarden-defaults
 }
 
@@ -105,4 +106,36 @@ POLICY_NUMBER=6
         --overrides='{"spec":{"shareProcessNamespace":true,"containers":[{"name":"nginx-privi-escalation-shared-pid","image":"nginx:alpine","securityContext":{"allowPrivilegeEscalation":true}}]}}'
 
     delete_policy policy-group-escalation-shared-pid.yaml
+}
+
+# scaffold cap pod-privileged:v1.0.10
+scaffold() {
+    local kind
+    [ "$1" = "cap" ] && kind=ClusterAdmissionPolicy || kind=AdmissionPolicy
+    kwctl scaffold manifest -t "$kind" "registry://ghcr.io/kubewarden/policies/$2"
+}
+
+@test "$(tfile) Always Accept AdmissionReviews On Deployments Namespace" {
+    # Define test policies
+    scaffold cap safe-labels:v1.0.9 | yq '
+        .spec.settings.denied_labels=["denycap"],
+        .spec.allowInsideAdmissionControllerNamespace = true' | kubectl apply -f -
+    scaffold ap safe-labels:v1.0.9 | yq '
+        with(.spec.rules[0]; .apiGroups=[""] | .apiVersions=["v1"] | .resources=["pods"]) |
+        .spec.settings.denied_labels=["denyap"] |
+        .metadata.namespace = env(NAMESPACE)' | kubectl apply -f -
+
+    # Both policies are allowed in controller ns
+    helmer set kubewarden-controller --set alwaysAcceptAdmissionReviewsOnDeploymentsNamespace=false
+    run ! kuberun -l denycap=1
+    run ! kuberun -n $NAMESPACE -l denycap=1
+    run ! kuberun -n $NAMESPACE -l denyap=1
+
+    # Policies are not allowed in controller ns
+    helmer set kubewarden-controller --set alwaysAcceptAdmissionReviewsOnDeploymentsNamespace=true
+    kuberun -n $NAMESPACE -l denyap=1,denycap=1
+
+    # Clean up
+    kubectl delete ap -n $NAMESPACE safe-labels
+    kubectl delete cap safe-labels
 }
