@@ -143,6 +143,6 @@ check_report_result() {
     wait_policyserver
 
     trigger_audit_scan
-    kubectl get policyreport -A 2>&1 | grep 'No resources found'
-    kubectl get clusterpolicyreport 2>&1 | grep 'No resources found'
+    kubectl get reports -A 2>&1 | grep 'No resources found'
+    kubectl get clusterreports 2>&1 | grep 'No resources found'
 }
