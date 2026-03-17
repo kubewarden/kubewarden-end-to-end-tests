@@ -98,8 +98,12 @@ find_chart_by_constraints () {
 
     # Find charts from Q_REPOs with version matching Q_VER, ordered by version
     [[ "$q_ver" =~ $EXCLUDE_PATTERN ]] || local expattern="$EXCLUDE_PATTERN"
-    charts=$(helm search repo --fail-on-no-result -r "e2e-rancher-$q_repo.*/rancher" --version "$q_ver" --versions -o json |\
-        jq -er --arg ex "${expattern:-}" '[.[] | select($ex == "" or (.version | test($ex) | not))] | unique_by(.name) | .[] | [.name, .version] | @tsv' | semsort -k2)
+    charts=$(helm search repo --fail-on-no-result -r "e2e-rancher-$q_repo.*/rancher" --version "$q_ver" --versions -o json | \
+        jq -er --arg ex "${expattern:-}" '
+            [ .[] | select($ex == "" or (.version | test($ex) | not)) ]
+            | group_by(.name)[]
+            | max_by(.version | [scan("[0-9]+|[a-zA-Z]+")] | map(try tonumber catch .))
+            | [.name, .version] | @tsv' | semsort -k2)
 
     # Same version can be in multiple repos (2.10.1 in prime, primerc, community)
     # Define repo priority: community > prime > communityalpha > primerc > primealpha
