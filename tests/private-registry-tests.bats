@@ -19,7 +19,7 @@ teardown_file() {
         --set policyServer.imagePullSecret=null \
         --set policyServer.sourceAuthorities=null
     # Can't delete secret - https://github.com/kubewarden/policy-server/issues/459
-    # kubectl --namespace kubewarden delete secret secret-registry-docker ||:
+    # kubectl delete secret -n kubewarden secret-registry-docker
 
     kubectl delete -f $RESOURCES_DIR/private-registry-deploy.yaml --ignore-not-found
     kubectl delete cm registry-auth --ignore-not-found
@@ -69,8 +69,6 @@ teardown_file() {
         --set policyServer.imagePullSecret=secret-registry-docker \
         --set policyServer.sourceAuthorities[0].uri="$REGISTRY" \
         --set-file policyServer.sourceAuthorities[0].certs[0]="$BATS_RUN_TMPDIR/certs/rootCA.crt"
-
-    helm get values -n $NAMESPACE kubewarden-defaults
 }
 
 @test "$(tfile) Check I can deploy policy from auth registry" {

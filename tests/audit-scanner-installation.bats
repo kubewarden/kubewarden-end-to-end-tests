@@ -4,12 +4,6 @@ setup() {
     setup_helper
 }
 
-function kubewarden_uninstall {
-    helmer uninstall defaults --ignore-not-found
-    helmer uninstall controller
-    helmer uninstall crds
-}
-
 # assert_crds true|false
 function assert_crds {
     run kubectl api-resources --no-headers
@@ -40,7 +34,7 @@ function assert_cronjob {
 }
 
 @test "$(tfile) Audit scanner resources are cleaned with kubewarden" {
-    kubewarden_uninstall
+    helmer uninstall
     assert_crds false
     assert_cronjob false
 }
@@ -61,7 +55,7 @@ function assert_cronjob {
     kubectl get crds clusterreports.openreports.io -o json | jq -e '.metadata.labels == null'
 
     # Kubewarden should not remove custom crds
-    kubewarden_uninstall
+    helmer uninstall --ignore-not-found
     assert_crds true
     assert_cronjob false
 
