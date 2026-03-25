@@ -39,7 +39,9 @@ NAMESPACE=${NAMESPACE:-kubewarden}
 REPO_NAME=${REPO_NAME:-kubewarden}
 # Use charts from [./dirname|reponame]
 CHARTS_LOCATION=${CHARTS_LOCATION:-$REPO_NAME}
-# Install from Application Collection
+# [1|0.5.1] - install from Application Collection
+# - 1: find AppCo (0.5.1) by VERSION (1.33.1) variable (use latest by default)
+# - 0.5.1: use specific AppCo, ignore VERSION variable
 APPCO="${APPCO:-}"
 
 # [next|prev|v1.17.0-rc2|local] - defaults to local if CHARTS_LOCATION is path, otherwise next
@@ -65,6 +67,8 @@ fi
 # Application Collection defaults
 APPCO_ARGS="--set global.imagePullSecrets[0]=application-collection ${APPCO_ARGS:-}"
 
+# Remove "v" prefix
+[[ $APPCO =~ ^v[0-9] ]] && APPCO="${APPCO#v}"
 # Prepend "v" and append .0 to partial versions
 [[ $VERSION =~ ^[1-9] ]] && VERSION="v$VERSION"
 [[ $VERSION =~ ^v[1-9]+\.[0-9]+$ ]] && VERSION="${VERSION}.0"
@@ -149,9 +153,9 @@ make_version_map() {
             && vMap["ssac"]=$APPCO \
             || vMap["ssac"]=$(curl -s https://apps.rancher.io/api/components/suse-security-admission-controller \
                 | jq -er --arg v "${VERSION#v}" '[.branches[].versions[] | select(.artifacts != [])] |
-                    if   $v == "next" then .[0]
-                    elif $v == "prev" then .[1]
-                    else .[] | select(.version_number == $v)
+                    if   $v | test("^v[0-9]") then .[] | select(.version_number == $v)
+                    elif $v == "prev"         then .[1]
+                    else                           .[0]
                     end | .artifacts[0].version')
     fi
 
@@ -473,8 +477,8 @@ case $1 in
         echo "### Helm ls:"
         helm ls -n "$NAMESPACE" -o json | jq ".[].chart"
         echo "### Current charts values:"
-        for chart in crds controller defaults; do
-            helm get values ${RANCHER:+rancher-}kubewarden-$chart -n "$NAMESPACE"
+        for chart in $(release_name kubewarden-crds kubewarden-controller kubewarden-defaults); do
+            helm get values ${RANCHER:+rancher-}$chart -n "$NAMESPACE"
         done
         ;;
     *)
