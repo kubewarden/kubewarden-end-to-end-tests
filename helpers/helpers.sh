@@ -79,7 +79,7 @@ policypath() { [[ "$1" == */* ]] && echo "$1" || echo "$RESOURCES_DIR/policies/$
 function apply_policy {
     [ "${1:-}" = '--no-wait' ] && local nowait=true && shift
 
-    local pfile kind
+    local pfile kind pols
     if [[ $# -eq 0 || "$1" == -* ]]; then
         # Policy yaml from pipe (-p /dev/stdin fails on github runner)
         pfile=$(mktemp -p "$BATS_RUN_TMPDIR" policy-XXXXX.yaml)
@@ -91,13 +91,14 @@ function apply_policy {
     fi
 
     # Find policy kind and apply
+    pols=$(yq '.spec.policyServer // "default"' "$pfile")
     kind=$(yq '.kind' "$pfile")
     kubectl apply -f "$pfile" "$@"
 
     # Wait for the policy to be active and uniquely reachable
     if [ ! -v nowait ]; then
         wait_for --for=condition="PolicyActive" "$kind" --all -A
-        wait_policyserver default
+        wait_policyserver "$pols"
         wait_for --for=condition="PolicyUniquelyReachable" "$kind" --all -A
     fi
 }
