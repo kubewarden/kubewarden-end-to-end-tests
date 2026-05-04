@@ -6,6 +6,7 @@
 
 setup() {
     setup_helper
+    load "../helpers/hostnetwork.sh"
 }
 
 teardown_file() {
@@ -24,17 +25,6 @@ teardown_file() {
     helmer reset kubewarden-controller
     helmer reset kubewarden-defaults
 }
-
-# get_metrics policy-server-default
-function get_metrics {
-    local svc=$1
-    is_appco && svc=${1/#kubewarden-controller/ssac-&}
-
-    kubectl delete pod curlpod --ignore-not-found
-    kubectl run curlpod -t -i --rm --image curlimages/curl:8.17.0 --restart=Never -- \
-        --silent $svc.$NAMESPACE.svc.cluster.local:8080/metrics
-}
-export -f get_metrics # required by retry command
 
 @test "$(tfile) Install OpenTelemetry, Prometheus, Jaeger" {
     # Required by OpenTelemetry
@@ -94,6 +84,29 @@ export -f get_metrics # required by retry command
     # Policy server & controller metrics should be available
     retry 'test $(get_metrics policy-server-default | wc -l) -gt 10'
     retry 'test $(get_metrics kubewarden-controller-metrics-service | wc -l) -gt 1'
+}
+
+@test "$(tfile) PolicyServer metricsPort changes the Service port" {
+    # spec.metricsPort is a Service-layer setting: it changes the port on the
+    # Kubernetes Service that Prometheus scrapes, but does NOT affect the port
+    # the pod binds (no KUBEWARDEN_METRICS_PORT env var is injected).
+    kubectl patch policyserver default --type=merge \
+        -p '{"spec": {"metricsPort": 9999}}'
+    wait_policyserver default
+
+    # Verify the Service metrics port updated
+    local svc_metrics_port
+    svc_metrics_port=$(kubectl get svc -n "$NAMESPACE" policy-server-default \
+        -o jsonpath='{.spec.ports[?(@.name=="metrics")].port}')
+    [[ "$svc_metrics_port" == "9999" ]]
+
+    # Verify metrics are still reachable through the new Service port
+    retry 'test $(get_metrics policy-server-default 9999 | wc -l) -gt 10'
+
+    # Reset to default metricsPort so downstream tests are unaffected
+    kubectl patch policyserver default --type=merge \
+        -p '{"spec": {"metricsPort": 8080}}'
+    wait_policyserver default
 }
 
 @test "$(tfile) Audit scanner runs should generate metrics" {

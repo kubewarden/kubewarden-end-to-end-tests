@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Shared helpers for hostNetwork and metrics-related BATS tests.
+# Source via: load "../helpers/hostnetwork.sh"
+
+# assert_deployment_hostnetwork <label-selector> <true|false>
+# Verifies that the deployment matching the selector has the expected
+# hostNetwork setting in its pod template.
+assert_deployment_hostnetwork() {
+    local label_selector="$1" expected="$2"
+    local hostnet
+
+    hostnet=$(kubectl get deployment -n "$NAMESPACE" -l "$label_selector" \
+        -o jsonpath='{.items[0].spec.template.spec.hostNetwork}')
+
+    if [[ "$expected" == "true" ]]; then
+        [[ "$hostnet" == "true" ]]
+    else
+        [[ -z "$hostnet" || "$hostnet" == "false" ]]
+    fi
+}
+
+# create_policyserver_with_ports <name> <webhookPort> <readinessProbePort>
+# Creates a PolicyServer CR with explicit custom ports, detecting the
+# correct image from the current Helm release.
+#
+# webhookPort and readinessProbePort are pod-side ports: they set env vars
+# (KUBEWARDEN_PORT and KUBEWARDEN_READINESS_PROBE_PORT) that determine which
+# host port the PolicyServer container actually binds. These must be unique
+# across all PolicyServers on the same host when hostNetwork is enabled.
+create_policyserver_with_ports() {
+    local name="$1" webhook_port="$2" readiness_port="$3"
+    local image
+
+    if is_appco; then
+        image="dp.apps.rancher.io/containers/kubewarden-policy-server:$(helm get values -a -n kubewarden ssac -o json | jq -er '."kubewarden-defaults".policyServer.image.tag')"
+    else
+        image="ghcr.io/$(helm get values -a kubewarden-defaults -n kubewarden -o json | jq -er '.policyServer.image | .repository + ":" + .tag')"
+    fi
+
+    kubectl apply -f - <<EOF
+apiVersion: policies.kubewarden.io/v1
+kind: PolicyServer
+metadata:
+  name: $name
+spec:
+  image: $image
+  replicas: 1
+  webhookPort: $webhook_port
+  readinessProbePort: $readiness_port
+EOF
+
+    wait_policyserver "$name"
+}
+
+# apply_policy_for_ps <ps-name> <policy-file>
+# Deploy a policy targeting a specific PolicyServer, appending the PS
+# name to the policy name to avoid collisions.
+apply_policy_for_ps() {
+    local ps_name="$1" policy_file="$2"
+    local pfile kind policy_name
+
+    pfile=$(policypath "$policy_file")
+    kind=$(yq '.kind' "$pfile")
+    policy_name=$(yq '.metadata.name' "$pfile")
+
+    yq ".spec.policyServer = \"$ps_name\" | .metadata.name = \"${policy_name}-${ps_name}\"" "$pfile" \
+        | kubectl apply -f -
+
+    wait_for --for=condition="PolicyActive" "$kind" --all -A
+    wait_policyserver "$ps_name"
+    wait_for --for=condition="PolicyUniquelyReachable" "$kind" --all -A
+}
+
+# get_metrics <service-name> [port]
+# Curls the Prometheus metrics endpoint of the given service.
+# Port defaults to 8080 (OTel sidecar/collector default).
+function get_metrics {
+    local svc=$1
+    local port=${2:-8080}
+    is_appco && svc=${1/#kubewarden-controller/ssac-&}
+
+    kubectl delete pod curlpod --ignore-not-found
+    kubectl run curlpod -t -i --rm --image curlimages/curl:8.17.0 --restart=Never -- \
+        --silent $svc.$NAMESPACE.svc.cluster.local:$port/metrics
+}
+export -f get_metrics
