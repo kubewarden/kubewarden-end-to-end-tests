@@ -54,14 +54,14 @@ helm_get() {
         test "$(haul_get kubewarden-helm-charts openreports)" = "$(helm_get kubewarden-crds '.dependencies[] | select(.name=="openreports").version')"
 
         # Signed images
-        test "$(haul_get kubewarden-container-images kubewarden-controller)" = "$(helm_get kubewarden-controller '.image.tag')"
-        test "$(haul_get kubewarden-container-images audit-scanner)" = "$(helm_get kubewarden-controller '.auditScanner.image.tag')"
-        test "$(haul_get kubewarden-container-images policy-server)" = "$(helm_get kubewarden-defaults '.policyServer.image.tag')"
+        test "$(haul_get kubewarden-container-images adm-controller/controller)" = "$(helm_get kubewarden-controller '.image.tag')"
+        test "$(haul_get kubewarden-container-images adm-controller/audit-scanner)" = "$(helm_get kubewarden-controller '.auditScanner.image.tag')"
+        test "$(haul_get kubewarden-container-images adm-controller/policy-server)" = "$(helm_get kubewarden-defaults '.policyServer.image.tag')"
 
         # Unsigned images
         test "$(haul_get kubewarden-not-signed-images policy-reporter)" = "$(helm show chart $polrep_url | yq -e '.appVersion')"
         test "$(haul_get kubewarden-not-signed-images policy-reporter-ui)" = "$(helm show values $polrep_url | yq -e '.ui.image.tag')"
-        test "$(haul_get kubewarden-not-signed-images kuberlr-kubectl)" = "$(helm_get kubewarden-controller '.preDeleteJob.image.tag')"
+        test "$(haul_get kubewarden-not-signed-images rancher/kuberlr-kubectl)" = "$(helm_get kubewarden-controller '.preDeleteJob.image.tag')"
         # Policies
         for policy in allow-privilege-escalation-psp capabilities-psp host-namespaces-psp hostpaths-psp pod-privileged user-group-psp; do
             test "$(haul_get kubewarden-policies $policy)" \
