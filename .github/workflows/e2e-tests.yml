@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: "Kwctl"
-        uses: kubewarden/github-actions/kwctl-installer@7bee120924c03de60befb15d9932b960aca2f4d6 # v5.2.0
+        uses: kubewarden/github-actions/kwctl-installer@143b9e4b11ddc47370482267383586e6f1bc7efe # v7.0.1
         with:
           KWCTL_VERSION: latest
 
