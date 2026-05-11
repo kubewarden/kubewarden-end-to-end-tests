@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -aeEuo pipefail
 # Shared OpenTelemetry-related BATS helpers.
 # Source via: load "../helpers/opentelemetry.sh"
 
