@@ -6,7 +6,7 @@
 
 setup() {
     setup_helper
-    load "../helpers/hostnetwork.sh"
+    load "../helpers/opentelemetry.sh"
 }
 
 teardown_file() {

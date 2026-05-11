@@ -22,6 +22,7 @@
 
 setup() {
     setup_helper
+    load "../helpers/opentelemetry.sh"
     load "../helpers/hostnetwork.sh"
 }
 
