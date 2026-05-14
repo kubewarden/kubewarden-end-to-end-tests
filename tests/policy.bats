@@ -124,15 +124,18 @@ scaffold() {
         with(.spec.rules[0]; .apiGroups=[""] | .apiVersions=["v1"] | .resources=["pods"]) |
         .spec.settings.denied_labels=["denyap"] |
         .metadata.namespace = env(NAMESPACE)' | kubectl apply -f -
+    wait_policies
 
     # Both policies are allowed in controller ns
     helmer set kubewarden-controller --set alwaysAcceptAdmissionReviewsOnDeploymentsNamespace=false
+    wait_policies
     run ! kuberun -l denycap=1
     run ! kuberun -n $NAMESPACE -l denycap=1
     run ! kuberun -n $NAMESPACE -l denyap=1
 
     # Policies are not allowed in controller ns
     helmer set kubewarden-controller --set alwaysAcceptAdmissionReviewsOnDeploymentsNamespace=true
+    wait_policies
     kuberun -n $NAMESPACE -l denyap=1,denycap=1
 
     # Clean up
