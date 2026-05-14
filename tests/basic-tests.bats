@@ -120,3 +120,39 @@ helm_get() {
 
     kubectl delete ps e2e-tests
 }
+
+@test "$(tfile) Deleting a PolicyServer keeps its policies in Scheduled status" {
+    if helm get values -n $NAMESPACE kubewarden-controller -o json | jq -e '.image.tag != "latest"'; then
+        skip "Trigger only on adm-controller until 1.36.0 release"
+    fi
+    
+    local ps=e2e-scheduled
+    local policy=safe-labels-for-pods
+
+    create_policyserver $ps
+    apply_policy_for_ps $ps safe-labels-pods-policy.yaml
+
+    # Sanity: the policy is active before deletion
+    [ "$(kubectl get cap $policy -o jsonpath='{.status.policyStatus}')" = "active" ]
+
+    # Capture the validating webhook configuration created for this policy
+    local webhook
+    webhook=$(kubectl get validatingwebhookconfigurations -o name | grep "$policy\$")
+    [ -n "$webhook" ]
+
+    # Delete the PolicyServer (--wait blocks only on the PolicyServer itself)
+    kubectl delete ps $ps --wait
+
+    # The policy resource is preserved
+    kubectl get cap $policy
+
+    # The policy transitions to Scheduled
+    kubectl wait --for=jsonpath='{.status.policyStatus}=scheduled' cap $policy --timeout=2m
+
+    # The validating webhook configuration was removed
+    run kubectl get $webhook
+    assert_failure
+
+    # Cleanup
+    kubectl delete cap $policy --wait
+}

@@ -113,6 +113,15 @@ function delete_policy {
     kubectl delete --wait -f "$(policypath "$1")" "${@:2}"
 }
 
+# apply_policy_for_ps <ps-name> <policy-file>
+# Deploy a policy targeting a specific PolicyServer.
+function apply_policy_for_ps {
+    local ps_name="$1"
+    local ps_file="$2"
+
+    ps="$ps_name" yq '.spec.policyServer = env(ps)' "$(policypath "$ps_file")" | apply_policy
+}
+
 # wait_policies [condition] - at least one policy must exist
 function wait_policies {
     local resources="admissionpolicies,clusteradmissionpolicies"
