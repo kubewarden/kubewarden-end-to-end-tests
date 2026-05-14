@@ -39,12 +39,18 @@ teardown_helper() {
     # Conditional skip (based on .skip file & KEEP var)
     if [[ -f "$BATS_RUN_TMPDIR/.skip" ]]; then
         if [[ "$BATS_TEST_FILENAME" == "$(< "$BATS_RUN_TMPDIR/.skip")" ]]; then
-            # Collect logs before teardown
-            kubectl get all -n $NAMESPACE >&3
-            kubectl get events -n $NAMESPACE >&3
-            kubectl logs -n $NAMESPACE -l app.kubernetes.io/component=controller --all-containers >&3
-            kubectl logs -n $NAMESPACE -l app.kubernetes.io/component=policy-server --all-containers >&3
-            kubectl describe pods -n $NAMESPACE >&3
+            # Print logs in CI before teardown
+            if [ -v CI ]; then
+                warn Get all -n $NAMESPACE >&3
+                kubectl get all -n $NAMESPACE >&3
+
+                warn Get events -n $NAMESPACE >&3
+                kubectl get events -n $NAMESPACE >&3
+
+                warn Get logs -n $NAMESPACE >&3
+                kubectl logs -n $NAMESPACE -l app.kubernetes.io/component=controller --all-containers >&3
+                kubectl logs -n $NAMESPACE -l app.kubernetes.io/component=policy-server --all-containers >&3
+            fi
             [[ -n "${KEEP:-}" ]] && skip "skip teardown of failed test"
         else
             skip "skip teardown of remaining tests"

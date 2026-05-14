@@ -125,7 +125,7 @@ helm_get() {
     if helm get values -n $NAMESPACE kubewarden-controller -o json | jq -e '.image.tag != "latest"'; then
         skip "Trigger only on adm-controller until 1.36.0 release"
     fi
-    
+
     local ps=e2e-scheduled
     local policy=safe-labels-for-pods
 
