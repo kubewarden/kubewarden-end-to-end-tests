@@ -64,7 +64,6 @@ teardown_file() {
         --set ports.metrics=63002
 
     wait_rollout deployment/kubewarden-controller
-    wait_policyserver default
 
     # Verify hostNetwork is enabled on both controller and policy-server
     assert_deployment_hostnetwork "app.kubernetes.io/name=kubewarden-controller" "true"
@@ -80,8 +79,7 @@ teardown_file() {
     apply_policy privileged-pod-policy.yaml
 
     # Unprivileged pod should succeed
-    kubectl run pause-hostnet --image=rancher/pause:3.2
-    wait_for pod pause-hostnet
+    kuberun --image=rancher/pause:3.2
 
     # Privileged pod should be blocked
     kubefail_privileged run pod-privileged-hostnet --image=rancher/pause:3.2 --privileged
@@ -136,8 +134,7 @@ teardown_file() {
     apply_policy_for_ps user-ps privileged-pod-policy.yaml
 
     # Unprivileged pod should succeed
-    kubectl run pause-multi-ps --image=rancher/pause:3.2
-    wait_for pod pause-multi-ps
+    kuberun --image=rancher/pause:3.2
 
     # Privileged pod should be blocked
     kubefail_privileged run pod-privileged-multi-ps --image=rancher/pause:3.2 --privileged
@@ -184,8 +181,7 @@ teardown_file() {
     # Deploy a policy on user-ps and verify evaluation works with the new ports
     apply_policy_for_ps user-ps privileged-pod-policy.yaml
 
-    kubectl run pause-crd-ports --image=rancher/pause:3.2
-    wait_for pod pause-crd-ports
+    kuberun --image=rancher/pause:3.2
 
     kubefail_privileged run pod-privileged-crd-ports --image=rancher/pause:3.2 --privileged
 
@@ -220,8 +216,7 @@ teardown_file() {
     # Verify policy evaluation still works after disabling hostNetwork
     apply_policy privileged-pod-policy.yaml
 
-    kubectl run pause-disable --image=rancher/pause:3.2
-    wait_for pod pause-disable
+    kuberun --image=rancher/pause:3.2
 
     kubefail_privileged run pod-privileged-disable --image=rancher/pause:3.2 --privileged
 

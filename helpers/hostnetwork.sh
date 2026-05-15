@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -aeEuo pipefail
 # Shared helpers for hostNetwork-related BATS tests.
 # Source via: load "../helpers/hostnetwork.sh"
 
@@ -12,11 +13,7 @@ assert_deployment_hostnetwork() {
     hostnet=$(kubectl get deployment -n "$NAMESPACE" -l "$label_selector" \
         -o jsonpath='{.items[0].spec.template.spec.hostNetwork}')
 
-    if [[ "$expected" == "true" ]]; then
-        [[ "$hostnet" == "true" ]]
-    else
-        [[ -z "$hostnet" || "$hostnet" == "false" ]]
-    fi
+    [[ "${expected:-false}" == "${hostnet:-false}" ]]
 }
 
 # create_policyserver_with_ports <name> <webhookPort> <readinessProbePort>
