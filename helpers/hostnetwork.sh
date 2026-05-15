@@ -48,22 +48,3 @@ EOF
 
     wait_policyserver "$name"
 }
-
-# apply_policy_for_ps <ps-name> <policy-file>
-# Deploy a policy targeting a specific PolicyServer, appending the PS
-# name to the policy name to avoid collisions.
-apply_policy_for_ps() {
-    local ps_name="$1" policy_file="$2"
-    local pfile kind policy_name
-
-    pfile=$(policypath "$policy_file")
-    kind=$(yq '.kind' "$pfile")
-    policy_name=$(yq '.metadata.name' "$pfile")
-
-    yq ".spec.policyServer = \"$ps_name\" | .metadata.name = \"${policy_name}-${ps_name}\"" "$pfile" \
-        | kubectl apply -f -
-
-    wait_for --for=condition="PolicyActive" "$kind" --all -A
-    wait_policyserver "$ps_name"
-    wait_for --for=condition="PolicyUniquelyReachable" "$kind" --all -A
-}

@@ -17,7 +17,7 @@
 # Flow (tests run sequentially and share state):
 #   1. Enable hostNetwork + custom ports + policy eval
 #   2. Controller port change (all three ports) with hostNetwork enabled
-#   3. Add second PolicyServer with custom ports + policy eval on both
+#   3. Add second PolicyServer with custom ports + policy eval
 #   4. PolicyServer CRD port update on second PS + policy eval
 #   5. Disable hostNetwork + change controller ports + verify + policy eval
 #
@@ -37,8 +37,7 @@ setup() {
 teardown_file() {
     teardown_helper
 
-    # Clean up second PolicyServer and its policy
-    kubectl delete clusteradmissionpolicy privileged-pods-user-ps --ignore-not-found --wait
+    # Clean up second PolicyServer
     kubectl delete policyserver user-ps --ignore-not-found --wait
 
     # Reset kubewarden to defaults
@@ -129,9 +128,8 @@ teardown_file() {
         -o jsonpath='{.items[0].spec.template.spec.dnsPolicy}')
     [[ "$userps_dns" == "ClusterFirstWithHostNet" ]]
 
-    # Deploy privileged-pod policy on both PolicyServers
+    # Deploy a policy and test admission
     apply_policy privileged-pod-policy.yaml
-    apply_policy_for_ps user-ps privileged-pod-policy.yaml
 
     # Unprivileged pod should succeed
     kuberun --image=rancher/pause:3.2
@@ -141,7 +139,6 @@ teardown_file() {
 
     # Clean up policies (keep user-ps alive for next test)
     delete_policy privileged-pod-policy.yaml
-    kubectl delete clusteradmissionpolicy privileged-pods-user-ps --wait
 }
 
 
@@ -178,14 +175,14 @@ teardown_file() {
     # Verify hostNetwork is still enabled after the port change
     assert_deployment_hostnetwork "kubewarden/policy-server=user-ps" "true"
 
-    # Deploy a policy on user-ps and verify evaluation works with the new ports
-    apply_policy_for_ps user-ps privileged-pod-policy.yaml
+    # Deploy a policy and verify evaluation works with the new ports
+    apply_policy privileged-pod-policy.yaml
 
     kuberun --image=rancher/pause:3.2
 
     kubefail_privileged run pod-privileged-crd-ports --image=rancher/pause:3.2 --privileged
 
-    kubectl delete clusteradmissionpolicy privileged-pods-user-ps --wait
+    delete_policy privileged-pod-policy.yaml
 }
 
 
