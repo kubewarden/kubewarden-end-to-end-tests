@@ -6,6 +6,8 @@
 
 setup() {
     setup_helper
+    load "../helpers/opentelemetry.sh"
+    load "../helpers/hostnetwork.sh"
 }
 
 teardown_file() {
@@ -16,25 +18,14 @@ teardown_file() {
     kubectl delete --ignore-not-found --namespace $NAMESPACE -f $RESOURCES_DIR/otel-collector-deployment.yaml
 
     # Remove installed apps
-    helm uninstall --wait -n jaeger jaeger-operator
-    helm uninstall --wait -n prometheus prometheus
-    helm uninstall --wait -n open-telemetry my-opentelemetry-operator
-    helm uninstall --wait -n cert-manager cert-manager
+    helm uninstall --wait -n jaeger jaeger-operator 2>/dev/null || true
+    helm uninstall --wait -n prometheus prometheus 2>/dev/null || true
+    helm uninstall --wait -n open-telemetry my-opentelemetry-operator 2>/dev/null || true
+    helm uninstall --wait -n cert-manager cert-manager 2>/dev/null || true
 
     helmer reset kubewarden-controller
     helmer reset kubewarden-defaults
 }
-
-# get_metrics policy-server-default
-function get_metrics {
-    local svc=$1
-    is_appco && svc=${1/#kubewarden-controller/ssac-&}
-
-    kubectl delete pod curlpod --ignore-not-found
-    kubectl run curlpod -t -i --rm --image curlimages/curl:8.17.0 --restart=Never -- \
-        --silent $svc.$NAMESPACE.svc.cluster.local:8080/metrics
-}
-export -f get_metrics # required by retry command
 
 @test "$(tfile) Install OpenTelemetry, Prometheus, Jaeger" {
     # Required by OpenTelemetry
@@ -96,6 +87,29 @@ export -f get_metrics # required by retry command
     retry 'test $(get_metrics kubewarden-controller-metrics-service | wc -l) -gt 1'
 }
 
+@test "$(tfile) PolicyServer metricsPort changes the Service port" {
+    # spec.metricsPort is a Service-layer setting: it changes the port on the
+    # Kubernetes Service that Prometheus scrapes, but does NOT affect the port
+    # the pod binds (no KUBEWARDEN_METRICS_PORT env var is injected).
+    kubectl patch policyserver default --type=merge \
+        -p '{"spec": {"metricsPort": 9999}}'
+    wait_policyserver default
+
+    # Verify the Service metrics port updated
+    local svc_metrics_port
+    svc_metrics_port=$(kubectl get svc -n "$NAMESPACE" policy-server-default \
+        -o jsonpath='{.spec.ports[?(@.name=="metrics")].port}')
+    [[ "$svc_metrics_port" == "9999" ]]
+
+    # Verify metrics are still reachable through the new Service port
+    retry 'test $(get_metrics policy-server-default 9999 | wc -l) -gt 10'
+
+    # Reset to default metricsPort so downstream tests are unaffected
+    kubectl patch policyserver default --type=merge \
+        -p '{"spec": {"metricsPort": 8080}}'
+    wait_policyserver default
+}
+
 @test "$(tfile) Audit scanner runs should generate metrics" {
     kubectl get cronjob -n $NAMESPACE audit-scanner
 
@@ -149,4 +163,145 @@ export -f get_metrics # required by retry command
 
     retry 'test $(get_metrics my-collector-collector | grep "kubewarden_policy_total" | wc -l) -gt 1'
     retry 'test $(get_metrics my-collector-collector | grep "kubewarden_policy_evaluations_total" | wc -l) -gt 1'
+}
+
+# --- HostNetwork + OTel transition scenarios ---
+
+@test "$(tfile) Enable sidecar telemetry and verify baseline" {
+    # Enable sidecar telemetry WITHOUT hostNetwork.
+    # Pre-set custom ports on defaults in preparation for later hostNetwork use.
+    helmer set kubewarden-defaults \
+        --set policyServer.replicaCount=1 \
+        --set policyServer.readinessProbePort=63003 \
+        --set policyServer.metricsPort=63004 \
+        --set policyServer.webhookPort=64005
+
+    helmer set kubewarden-controller \
+        --values $RESOURCES_DIR/opentelemetry-telemetry.yaml
+
+    wait_rollout deployment/kubewarden-controller
+    wait_policyserver default
+
+    # Verify hostNetwork is NOT enabled
+    assert_deployment_hostnetwork "app.kubernetes.io/name=kubewarden-controller" "false"
+    assert_deployment_hostnetwork "kubewarden/policy-server=default" "false"
+
+    # Verify otc-container sidecar IS running on pods
+    retry "kubectl get pods -n $NAMESPACE -l 'app.kubernetes.io/component in (controller,policy-server)' -o json \
+        | jq -e 'all(.items[]; (.spec.initContainers[]?, .spec.containers[]) | select(.name == \"otc-container\"))'"
+
+    # Verify sidecar annotation on controller deployment
+    kubectl get deployment -n $NAMESPACE kubewarden-controller -o json \
+        | jq -e '.spec.template.metadata.annotations["sidecar.opentelemetry.io/inject"] == "true"'
+
+    # Verify --enable-otel-sidecar flag in controller args
+    kubectl get deployment -n $NAMESPACE kubewarden-controller -o json \
+        | jq -e '.spec.template.spec.containers[0].args | any(. == "--enable-otel-sidecar")'
+
+    # Deploy policy and verify evaluation through sidecars
+    apply_policy privileged-pod-policy.yaml
+
+    kubectl run pause-sidecar --image=rancher/pause:3.2
+    wait_for pod pause-sidecar
+
+    kubefail_privileged run pod-priv-sidecar --image=rancher/pause:3.2 --privileged
+
+    # Generate metric data and verify metrics through sidecar
+    kubectl run pod-priv-sidecar-m --image=rancher/pause:3.2 --privileged 2>/dev/null || true
+    kubectl delete pod pod-priv-sidecar-m --ignore-not-found --wait=false
+
+    retry 'test $(get_metrics policy-server-default 63004 | wc -l) -gt 10'
+}
+
+@test "$(tfile) Switch to custom telemetry and enable hostNetwork" {
+    # Combined transition: sidecar → custom telemetry AND hostNetwork=false → true
+    # in a single Helm upgrade.
+    helmer set kubewarden-controller --set hostNetwork=true \
+        --set ports.webhook=63000 \
+        --set ports.healthProbe=63001 \
+        --set ports.metrics=63002 \
+        --values $RESOURCES_DIR/opentelemetry-telemetry-remote.yaml
+
+    wait_rollout deployment/kubewarden-controller
+    wait_policyserver default
+
+    # Verify hostNetwork enabled on both controller and PS
+    assert_deployment_hostnetwork "app.kubernetes.io/name=kubewarden-controller" "true"
+    assert_deployment_hostnetwork "kubewarden/policy-server=default" "true"
+
+    # Policy must still be active after the transition
+    wait_for --for=condition="PolicyActive" clusteradmissionpolicy --all -A
+
+    # Controller must NO longer have --enable-otel-sidecar flag
+    kubectl get deployment -n $NAMESPACE kubewarden-controller -o json \
+        | jq -e '.spec.template.spec.containers[0].args | any(. == "--enable-otel-sidecar") | not'
+
+    # Controller must NO longer have sidecar annotation
+    kubectl get deployment -n $NAMESPACE kubewarden-controller -o json \
+        | jq -e '(.spec.template.metadata.annotations // {}) | has("sidecar.opentelemetry.io/inject") | not'
+
+    # Controller must have the custom OTEL_EXPORTER_OTLP_ENDPOINT env var
+    kubectl get deployment -n $NAMESPACE kubewarden-controller -o json \
+        | jq -e '.spec.template.spec.containers[0].env[] | select(.name == "OTEL_EXPORTER_OTLP_ENDPOINT")'
+
+    # PS deployment must NOT have sidecar annotation
+    kubectl get deployment -n $NAMESPACE -l 'kubewarden/policy-server=default' -o json \
+        | jq -e 'all(.items[]; (.spec.template.metadata.annotations // {}) | has("sidecar.opentelemetry.io/inject") | not)'
+
+    # PS container must have the custom OTEL_EXPORTER_OTLP_ENDPOINT env var
+    kubectl get deployment -n $NAMESPACE -l 'kubewarden/policy-server=default' -o json \
+        | jq -e '.items[0].spec.template.spec.containers[0].env[] | select(.name == "OTEL_EXPORTER_OTLP_ENDPOINT")'
+
+    # Verify NO otc-container sidecar on pods
+    kubectl get pods -n $NAMESPACE -l 'app.kubernetes.io/component in (controller,policy-server)' -o json \
+        | jq -e 'all(.items[]; (.spec.initContainers + .spec.containers | map(.name) | contains(["otc-container"]) | not))'
+
+    # Verify metrics ports exist on services
+    kubectl get services -n $NAMESPACE policy-server-default -o json \
+        | jq -e 'any(.spec.ports[]; .name == "metrics")'
+    kubectl get services -n $NAMESPACE -l app.kubernetes.io/name=kubewarden-controller -o json \
+        | jq -e 'any(.items[].spec.ports[]; .name == "metrics")'
+}
+
+@test "$(tfile) Policy evaluation and metrics with custom telemetry" {
+    # Unprivileged pod should be accepted
+    kubectl run pause-custom --image=rancher/pause:3.2
+    wait_for pod pause-custom
+
+    # Privileged pod should be rejected
+    kubefail_privileged run pod-priv-custom --image=rancher/pause:3.2 --privileged
+
+    # Generate metric data
+    kubectl run pod-priv-custom-m --image=rancher/pause:3.2 --privileged 2>/dev/null || true
+    kubectl delete pod pod-priv-custom-m --ignore-not-found --wait=false
+
+    # Verify metrics arrive at the custom collector
+    retry 'test $(get_metrics my-collector-collector | grep "kubewarden_policy_evaluations_total" | wc -l) -gt 0'
+    retry 'test $(get_metrics my-collector-collector | grep "kubewarden_policy_total" | wc -l) -gt 0'
+}
+
+@test "$(tfile) Disable hostNetwork — custom telemetry continues" {
+    helmer set kubewarden-controller --set hostNetwork=false
+    wait_rollout deployment/kubewarden-controller
+    wait_policyserver default
+
+    # Verify hostNetwork disabled
+    assert_deployment_hostnetwork "app.kubernetes.io/name=kubewarden-controller" "false"
+    assert_deployment_hostnetwork "kubewarden/policy-server=default" "false"
+
+    # Policy evaluation must still work
+    kubectl run pause-post --image=rancher/pause:3.2
+    wait_for pod pause-post
+
+    kubefail_privileged run pod-priv-post --image=rancher/pause:3.2 --privileged
+
+    # Generate fresh metric data
+    kubectl run pod-priv-post-m --image=rancher/pause:3.2 --privileged 2>/dev/null || true
+    kubectl delete pod pod-priv-post-m --ignore-not-found --wait=false
+
+    # Verify metrics still arrive at the collector
+    retry 'test $(get_metrics my-collector-collector | grep "kubewarden_policy_evaluations_total" | wc -l) -gt 0'
+    retry 'test $(get_metrics my-collector-collector | grep "kubewarden_policy_total" | wc -l) -gt 0'
+
+    delete_policy privileged-pod-policy.yaml
 }
