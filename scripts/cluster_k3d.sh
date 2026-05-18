@@ -3,7 +3,7 @@ set -aeEuo pipefail
 trap 'echo "Error on ${BASH_SOURCE/$PWD/.}:${LINENO} $(sed -n "${LINENO} s/^\s*//p" $PWD/${BASH_SOURCE/$PWD})"' ERR
 
 # Optional variables
-K3S=${K3S:-$(k3d version -o json | jq -r '.k3s')}
+K3S=${K3S:-$(kubectl version --client -o json | jq -r '.clientVersion | .major+"."+.minor')}
 CLUSTER_NAME=${CLUSTER_NAME:-k3s-default}
 MASTER_COUNT=${MASTER_COUNT:-1}
 WORKER_COUNT=${WORKER_COUNT:-0}
