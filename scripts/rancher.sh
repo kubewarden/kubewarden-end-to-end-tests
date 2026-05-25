@@ -40,13 +40,12 @@ create_k3d_cluster() {
     local k8s=""
     case "$rancher" in
         # Limit k8s version - https://www.suse.com/suse-rancher/support-matrix
-        2.8*)  k8s="v1.28" ;; # v1.25 - v1.28
-        2.9*)  k8s="v1.30" ;; # v1.27 - v1.30
         2.10*) k8s="v1.31" ;; # v1.28 - v1.31
         2.11*) k8s="v1.32" ;; # v1.30 - v1.32
         2.12*) k8s="v1.33" ;; # v1.31 - v1.33
         2.13*) k8s="v1.34" ;; # v1.32 - v1.34
-        2.14*) k8s="v1.35" ;; # TBD
+        2.14*) k8s="v1.35" ;; # v1.33 - v1.35
+        2.15*) k8s="v1.36" ;; # v1.34 - v1.36
     esac
     K3S="${K3S:-$k8s}" "$BASEDIR"/cluster_k3d.sh create "${@:2}"
 }
@@ -61,11 +60,8 @@ helm_add_repositories() {
     ar e2e-rancher-community https://releases.rancher.com/server-charts/latest
     ar e2e-rancher-communityalpha https://releases.rancher.com/server-charts/alpha
     helm repo update e2e-rancher-prime e2e-rancher-primerc e2e-rancher-primealpha e2e-rancher-community e2e-rancher-communityalpha e2e-jetstack > /dev/null
-    ar e2e-rancher-head-210 https://charts.optimus.rancher.io/server-charts/release-2.10
-    ar e2e-rancher-head-211 https://charts.optimus.rancher.io/server-charts/release-2.11
-    ar e2e-rancher-head-212 https://charts.optimus.rancher.io/server-charts/release-2.12
-    ar e2e-rancher-head-213 https://charts.optimus.rancher.io/server-charts/release-2.13
-    helm repo update e2e-rancher-head-210 e2e-rancher-head-211 e2e-rancher-head-212 e2e-rancher-head-213 > /dev/null
+    ar e2e-rancher-head-215 https://charts.optimus.rancher.io/server-charts/release-2.15
+    helm repo update e2e-rancher-head-215 > /dev/null
 }
 
 # Find repository & highest version based on constraints
