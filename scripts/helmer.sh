@@ -151,7 +151,7 @@ make_version_map() {
     if is_appco; then
         [[ $APPCO =~ [0-9]+\.[0-9]+\.[0-9]+ ]] \
             && vMap["ssac"]=$APPCO \
-            || vMap["ssac"]=$(curl -s https://apps.rancher.io/api/components/suse-security-admission-controller \
+            || vMap["ssac"]=$(curl -s https://api.apps.rancher.io/v1/components/suse-security-admission-controller \
                 | jq -er --arg v "${VERSION#v}" '[.branches[].versions[] | select(.artifacts != [])] |
                     if   $v | test("^v[0-9]") then .[] | select(.version_number == $v)
                     elif $v == "prev"         then .[1]
