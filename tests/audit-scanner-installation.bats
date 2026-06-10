@@ -46,8 +46,7 @@ function assert_cronjob {
     assert_crds true
 
     # Install kubewarden with existing policyreport crds
-    helmer reinstall crds --set installOpenReportsCRDs=False
-    helmer reinstall controller
+    helmer reinstall controller --set installOpenReportsCRDs=False
     assert_cronjob true
 
     # Check policy reports did not come from helm (have no labels)

@@ -31,20 +31,36 @@
 
 setup() {
     setup_helper
-    load "../helpers/hostnetwork.sh"
+    load "../helpers/opentelemetry.sh"
 }
 
 teardown_file() {
     teardown_helper
 
     # Clean up second PolicyServer
-    kubectl delete policyserver user-ps --ignore-not-found --wait
-
+    kubectl delete policyserver user-ps --ignore-not-found
     # Reset kubewarden to defaults
     helmer reset kubewarden-controller
-    helmer reset kubewarden-defaults
 }
 
+# create_policyserver_with_ports <name> <webhookPort> <readinessProbePort>
+# Creates a PolicyServer CR with explicit custom ports, detecting the
+# correct image from the current Helm release.
+#
+# webhookPort and readinessProbePort are pod-side ports: they set env vars
+# (KUBEWARDEN_PORT and KUBEWARDEN_READINESS_PROBE_PORT) that determine which
+# host port the PolicyServer container actually binds. These must be unique
+# across all PolicyServers on the same host when hostNetwork is enabled.
+create_policyserver_with_ports() {
+    local name="$1" webhook_port="$2" readiness_port="$3"
+
+    policyserver_yaml "$name" \
+        | wp=$webhook_port rp=$readiness_port yq '
+            .spec |= (.webhookPort=env(wp) | .readinessProbePort=env(rp))' \
+        | kubectl apply -f -
+
+    wait_policyserver "$name"
+}
 
 @test "$(tfile) Enable hostNetwork with custom ports and verify policy evaluation" {
     # Single-node friendly setup: one PolicyServer replica, no anti-affinity.
@@ -52,15 +68,13 @@ teardown_file() {
     # IMPORTANT: set custom ports on defaults BEFORE enabling hostNetwork on
     # the controller, so the reconciler never creates a PS with default ports
     # that would collide on the host.
-    helmer set kubewarden-defaults \
-        --set policyServer.replicaCount=1 \
-        --set policyServer.readinessProbePort=63003 \
-        --set policyServer.webhookPort=64005
-
     helmer set kubewarden-controller --set hostNetwork=true \
         --set ports.webhook=63000 \
         --set ports.healthProbe=63001 \
-        --set ports.metrics=63002
+        --set ports.metrics=63002 \
+        --set policyServer.replicaCount=1 \
+        --set policyServer.readinessProbePort=63003 \
+        --set policyServer.webhookPort=64005 \
 
     wait_rollout deployment/kubewarden-controller
 
@@ -77,10 +91,8 @@ teardown_file() {
     # Deploy a policy and test admission
     apply_policy privileged-pod-policy.yaml
 
-    # Unprivileged pod should succeed
-    kuberun --image=rancher/pause:3.2
-
-    # Privileged pod should be blocked
+    # Only privileged pod should be blocked
+    kuberun true
     kubefail_privileged run pod-privileged-hostnet --image=rancher/pause:3.2 --privileged
 
     delete_policy privileged-pod-policy.yaml
@@ -131,10 +143,7 @@ teardown_file() {
     # Deploy a policy and test admission
     apply_policy privileged-pod-policy.yaml
 
-    # Unprivileged pod should succeed
-    kuberun --image=rancher/pause:3.2
-
-    # Privileged pod should be blocked
+    kuberun true
     kubefail_privileged run pod-privileged-multi-ps --image=rancher/pause:3.2 --privileged
 
     # Clean up policies (keep user-ps alive for next test)
@@ -178,8 +187,7 @@ teardown_file() {
     # Deploy a policy and verify evaluation works with the new ports
     apply_policy privileged-pod-policy.yaml
 
-    kuberun --image=rancher/pause:3.2
-
+    kuberun true
     kubefail_privileged run pod-privileged-crd-ports --image=rancher/pause:3.2 --privileged
 
     delete_policy privileged-pod-policy.yaml
@@ -213,8 +221,7 @@ teardown_file() {
     # Verify policy evaluation still works after disabling hostNetwork
     apply_policy privileged-pod-policy.yaml
 
-    kuberun --image=rancher/pause:3.2
-
+    kuberun true
     kubefail_privileged run pod-privileged-disable --image=rancher/pause:3.2 --privileged
 
     delete_policy privileged-pod-policy.yaml

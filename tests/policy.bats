@@ -7,14 +7,13 @@ teardown_file() {
     teardown_helper
     kubectl delete ns shouldbeignored --ignore-not-found
     helmer reset kubewarden-controller
-    helmer reset kubewarden-defaults
 }
 
 # Number of policies included in the recommended policies
 POLICY_NUMBER=6
 
 @test "$(tfile) Install recommended policies in protect mode" {
-    helmer set kubewarden-defaults \
+    helmer set kubewarden-controller \
         --set recommendedPolicies.enabled=True \
         --set recommendedPolicies.defaultPolicyMode=protect \
         --set recommendedPolicies.skipAdditionalNamespaces[0]='shouldbeignored'
@@ -56,7 +55,7 @@ POLICY_NUMBER=6
 }
 
 @test "$(tfile) Disable recommended policies" {
-    helmer set kubewarden-defaults --set recommendedPolicies.enabled=False
+    helmer set kubewarden-controller --set recommendedPolicies.enabled=False
     kubectl run pod-privileged --image=rancher/pause:3.2 --privileged
     kubectl delete pod pod-privileged
 }

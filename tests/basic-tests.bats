@@ -35,9 +35,6 @@ helm_get() {
 @test "$(tfile) Version checks" {
     # Helm app version is consistent
     helm list -n "$NAMESPACE" -o json | jq 'map(.app_version) | unique | length == 1'
-    # Check auto-install annotation
-    test "$(helm_get kubewarden-controller '.annotations["catalog.cattle.io/auto-install"] | split("=")[1]')" = "$(helm_get kubewarden-crds '.version')"
-    test "$(helm_get kubewarden-defaults '.annotations["catalog.cattle.io/auto-install"] | split("=")[1]')" = "$(helm_get kubewarden-crds '.version')"
 
     # Hauler manifest versions for PRs
     if [[ "$CHARTS_LOCATION" == */* ]]; then
@@ -47,16 +44,14 @@ helm_get() {
         polrep_url=https://github.com/kyverno/policy-reporter/releases/download/policy-reporter-$polrep_ver/policy-reporter-$polrep_ver.tgz
 
         # Helm Charts
-        for chart in kubewarden-crds kubewarden-controller kubewarden-defaults; do
-            test "$(haul_get kubewarden-helm-charts $chart)" = "$(helm_get $chart '.version')"
-        done
+        test "$(haul_get kubewarden-helm-charts kubewarden-controller)" = "$(helm_get kubewarden-controller '.version')"
         test "$(haul_get kubewarden-helm-charts policy-reporter)" = "$polrep_ver"
-        test "$(haul_get kubewarden-helm-charts openreports)" = "$(helm_get kubewarden-crds '.dependencies[] | select(.name=="openreports").version')"
+        test "$(haul_get kubewarden-helm-charts openreports)" = "$(helm_get kubewarden-controller '.dependencies[] | select(.name=="openreports").version')"
 
         # Signed images
         test "$(haul_get kubewarden-container-images adm-controller/controller)" = "$(helm_get kubewarden-controller '.image.tag')"
         test "$(haul_get kubewarden-container-images adm-controller/audit-scanner)" = "$(helm_get kubewarden-controller '.auditScanner.image.tag')"
-        test "$(haul_get kubewarden-container-images adm-controller/policy-server)" = "$(helm_get kubewarden-defaults '.policyServer.image.tag')"
+        test "$(haul_get kubewarden-container-images adm-controller/policy-server)" = "$(helm_get kubewarden-controller '.policyServer.image.tag')"
 
         # Unsigned images
         test "$(haul_get kubewarden-not-signed-images policy-reporter)" = "$(helm show chart $polrep_url | yq -e '.appVersion')"
@@ -65,7 +60,7 @@ helm_get() {
         # Policies
         for policy in allow-privilege-escalation-psp capabilities-psp host-namespaces-psp hostpaths-psp pod-privileged user-group-psp; do
             test "$(haul_get kubewarden-policies $policy)" \
-                = "$(helm_get kubewarden-defaults | p=$policy yq '.recommendedPolicies[].module? | select(.repository == "*"+env(p)).tag')"
+                = "$(helm_get kubewarden-controller | p=$policy yq '.recommendedPolicies[].module? | select(.repository == "*"+env(p)).tag')"
         done
     fi
 }

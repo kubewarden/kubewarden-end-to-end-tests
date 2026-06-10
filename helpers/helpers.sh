@@ -139,18 +139,20 @@ function wait_policies {
     done
 }
 
+# policyserver_yaml <name>
+# Prints minimal policy server yaml based on default .policyServer.image.
 # When we test new features we might requite latest/stable policy-server
-# This deploys same image as defaults, utilizing LATEST=1 hack if needed
-# create_policyserver [name]
-function create_policyserver {
-    local name="${1:-pserver}"
+# This deploys same image as defaults, utilizing LATEST=1 image if needed
+function policyserver_yaml {
+    local name="$1"
     local image
     if is_appco; then
         image="dp.apps.rancher.io/containers/kubewarden-policy-server:$(helm get values -a -n kubewarden ssac -o json | jq -er '."kubewarden-defaults".policyServer.image.tag')"
     else
-        image="ghcr.io/$(helm get values -a kubewarden-defaults -n kubewarden -o json | jq -er '.policyServer.image | .repository + ":"+ .tag')"
+        image="ghcr.io/$(helm get values -a kubewarden-controller -n kubewarden -o json | jq -er '.policyServer.image | .repository + ":"+ .tag')"
     fi
-    kubectl apply -f - <<EOF
+
+    cat - <<EOF
 apiVersion: policies.kubewarden.io/v1
 kind: PolicyServer
 metadata:
@@ -159,7 +161,12 @@ spec:
   image: $image
   replicas: 1
 EOF
+}
 
+# create_policyserver [name]
+function create_policyserver {
+    local name="${1:-pserver}"
+    policyserver_yaml "$name" | kubectl apply -f -
     wait_policyserver "$name"
 }
 

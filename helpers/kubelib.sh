@@ -144,7 +144,7 @@ function generate_certs {
 # kuberun [kubectl args] -- [command [args]]
 function kuberun {
     # No kubectl args: add -- separator
-    [ "${1:0:1}" != "-" ] && set -- -- "$@"
+    [[ $# -gt 0 && "${1:0:1}" != "-" ]] && set -- -- "$@"
     # No command (-- is missing): use -- true as default
     [[ " $* " != *" -- "* ]] && set -- "$@" -- true
     # Set command defaults
@@ -192,7 +192,7 @@ precheck() {
         ;;&
         kubewarden|rancher)
             # Fail if Kubewarden is already installed
-            if kubectl get cap &>/dev/null; then
+            if helm status -n $NAMESPACE kubewarden-controller &>/dev/null; then
                 error "Kubewarden already exists!"
                 helm ls -n $NAMESPACE -o json | jq -r '"Kubewarden: \(.[0].app_version)", (.[].chart | " - " + .)'
                 return 1
