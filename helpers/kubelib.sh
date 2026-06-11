@@ -30,9 +30,9 @@ function retry() {
     local i status
 
     for ((i=1; i<=tries; i++)); do
-        timeout "$delay" bash -c "$cmd" && break || status=$?
+        timeout "$delay" bash -c "$cmd" </dev/null && break || status=$?
         if [[ $i -lt $tries ]]; then
-            echo "RETRY #$i: $cmd"
+            echo "RETRY #$i [$status]: $cmd"
             [[ $status -ne 124 ]] && sleep $delay
         else
             echo "Godot ($status): $cmd"; false
@@ -148,10 +148,10 @@ function kuberun {
     # No command (-- is missing): use -- true as default
     [[ " $* " != *" -- "* ]] && set -- "$@" -- true
     # Set command defaults
-    [[ "$*" =~ "-- wget" ]] && set -- "${@/-- wget/-- wget --quiet --no-check-certificates}"
-    [[ "$*" =~ "-- curl" ]] && set -- "${@/-- curl/-- curl -k --no-progress-meter}"
+    [[ "$*" =~ "-- wget" ]] && set -- -- wget --quiet --no-check-certificate "${@:3}"
+    [[ "$*" =~ "-- curl" ]] && set -- -- curl -k --no-progress-meter "${@:3}"
 
-    kubectl run "pod-$(date +%s)" --image=busybox --restart=Never --rm -it -q --command "$@"
+    kubectl run "pod-$(date +%s)" --image=busybox --restart=Never --rm -i -q --command "$@"
 }
 export -f kuberun
 
