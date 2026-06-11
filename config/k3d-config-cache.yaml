@@ -16,6 +16,7 @@ kind: Simple
 registries:
   create:
     name: k3d-docker.io
+    image: registry:3
     proxy:
       remoteURL: https://registry-1.docker.io
       # Authenticate to Docker Hub (increase rate limit to 200 pulls per hour)
