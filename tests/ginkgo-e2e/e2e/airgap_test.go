@@ -154,57 +154,25 @@ var _ = Describe("E2E - Deploy K3S/Rancher in airgap environment", Label("airgap
 			Expect(err).To(Not(HaveOccurred()))
 		})
 
-		By("Installing Kubewarden crds", func() {
-			// Set flags for Kubewarden-crds installation
+		By("Installing admission controller", func() {
+			// Set flags for admission controller installation
 			flags := []string{
-				"upgrade", "--install", "kubewarden-crds", "oci://" + repoServer + "/hauler/kubewarden-crds",
+				"upgrade", "--install", "admission-controller", "oci://" + repoServer + "/hauler/admission-controller",
 				"--namespace", "kubewarden",
 				"--create-namespace",
 				"--plain-http",
-				"--devel",
-			}
-
-			RunHelmCmdWithRetry(flags...)
-		})
-
-		By("Installing Kubewarden controller", func() {
-			// Set flags for Kubewarden controller installation
-			flags := []string{
-				"upgrade", "--install", "kubewarden-controller", "oci://" + repoServer + "/hauler/kubewarden-controller",
-				"--namespace", "kubewarden",
-				"--plain-http",
 				"--set", "global.cattle.systemDefaultRegistry=" + repoServer,
-				"--set", "image.tag=" + kubewardenControllerVersion,
+				"--set", "image.tag=" + admControllerVersion,
 				"--set", "auditScanner.image.tag=" + auditScannerVersion,
-				"--wait", "--wait-for-jobs",
-				"--devel",
-			}
-
-			RunHelmCmdWithRetry(flags...)
-
-			// Wait for all pods to be started
-			checkList := [][]string{
-				{"kubewarden", "app.kubernetes.io/name=kubewarden-controller"},
-			}
-			err := rancher.CheckPod(k, checkList)
-			Expect(err).To(Not(HaveOccurred()))
-		})
-
-		By("Installing Kubewarden defaults", func() {
-			// Set flags for Kubewarden defaults installation
-			flags := []string{
-				"upgrade", "--install", "kubewarden-defaults", "oci://" + repoServer + "/hauler/kubewarden-defaults",
-				"--namespace", "kubewarden",
-				"--plain-http",
-				"--set", "global.cattle.systemDefaultRegistry=" + repoServer,
+				"--set", "policyServer.image.tag=" + policyServerVersion,
 				"--set", "policyServer.insecureSources[0]=" + rancherManager,
 				"--set", "policyServer.insecureSources[1]=" + repoServer,
-				"--set", "policyServer.image.tag=" + policyServerVersion,
 				"--set", "recommendedPolicies.enabled=true",
 				"--set", "recommendedPolicies.defaultPoliciesRegistry=" + repoServer,
 				"--wait", "--wait-for-jobs",
 				"--devel",
 			}
+
 			// Add policy versions only if not upgrade test
 			if testType != "upgrade" {
 				flags = append(flags,
@@ -216,13 +184,18 @@ var _ = Describe("E2E - Deploy K3S/Rancher in airgap environment", Label("airgap
 					"--set", "recommendedPolicies.capabilitiesPolicy.module.tag="+capabilitiesPolicyVersion,
 				)
 			}
+
 			RunHelmCmdWithRetry(flags...)
 
-			// Wait for pod to be started
-			err := rancher.CheckPod(k, [][]string{{"kubewarden", "app.kubernetes.io/name=policy-server"}})
+			// Wait for all pods to be started
+			checkList := [][]string{
+				{"kubewarden", "app.kubernetes.io/name=admission-controller"},
+				{"kubewarden", "app.kubernetes.io/component=policy-server"},
+			}
+			err := rancher.CheckPod(k, checkList)
 			Expect(err).To(Not(HaveOccurred()))
-
 		})
+
 		// TODO: check all policies
 		By("Checking that one policy is in active state", func() {
 			Eventually(func() string {
