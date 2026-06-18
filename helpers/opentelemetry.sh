@@ -9,7 +9,7 @@ set -aeEuo pipefail
 function get_metrics {
     local svc=$1
     local port=${2:-8080}
-    is_appco && svc=${1/#kubewarden-controller/ssac-&}
+    is_appco && svc=${1/#admission-controller/ssac-&}
 
     kubectl delete pod curlpod --ignore-not-found
     kubectl run curlpod -t -i --rm --image curlimages/curl:8.17.0 --restart=Never -- \

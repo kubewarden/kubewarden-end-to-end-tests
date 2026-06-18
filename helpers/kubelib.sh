@@ -113,7 +113,7 @@ is_version() {
 }
 
 # Query against installed kubewarden app version
-kw_version() { is_version "$1" "$(helm ls -n "$NAMESPACE" -f 'kubewarden-crds|ssac' -o json | jq -r '.[0].app_version')"; }
+kw_version() { is_version "$1" "$(helm ls -n "$NAMESPACE" -f 'admission-controller|ssac' -o json | jq -r '.[0].app_version')"; }
 
 is_appco() { [ -n "${APPCO:-}" ] || helm status -n $NAMESPACE ssac &>/dev/null; }
 
@@ -192,7 +192,7 @@ precheck() {
         ;;&
         kubewarden|rancher)
             # Fail if Kubewarden is already installed
-            if helm status -n $NAMESPACE kubewarden-controller &>/dev/null; then
+            if helm status -n $NAMESPACE admission-controller &>/dev/null; then
                 error "Kubewarden already exists!"
                 helm ls -n $NAMESPACE -o json | jq -r '"Kubewarden: \(.[0].app_version)", (.[].chart | " - " + .)'
                 return 1

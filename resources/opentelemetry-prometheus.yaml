@@ -10,10 +10,10 @@ prometheus:
       endpoints:
         - port: metrics
           interval: 10s
-    - name: kubewarden-controller
+    - name: admission-controller
       selector:
         matchLabels:
-          app.kubernetes.io/name: kubewarden-controller
+          app.kubernetes.io/name: admission-controller
       namespaceSelector:
         matchNames:
           - kubewarden

@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# https://github.com/kubewarden/kubewarden-controller/pull/421
+# https://github.com/kubewarden/admission-controller/pull/421
 
 setup() {
     setup_helper
@@ -15,7 +15,7 @@ setup() {
 teardown_file() {
     teardown_helper
 
-    helmer set kubewarden-controller \
+    helmer set admission-controller \
         --set policyServer.imagePullSecret=null \
         --set policyServer.sourceAuthorities=null
     # Can't delete secret - https://github.com/kubewarden/policy-server/issues/459
@@ -65,7 +65,7 @@ teardown_file() {
       --docker-server=$REGISTRY
 
     # Edit default policy server config
-    helmer set kubewarden-controller \
+    helmer set admission-controller \
         --set policyServer.imagePullSecret=secret-registry-docker \
         --set policyServer.sourceAuthorities[0].uri="$REGISTRY" \
         --set-file policyServer.sourceAuthorities[0].certs[0]="$BATS_RUN_TMPDIR/certs/rootCA.crt"

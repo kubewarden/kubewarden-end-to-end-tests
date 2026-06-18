@@ -27,7 +27,7 @@ function assert_cronjob {
 }
 
 @test "$(tfile) Reconfigure audit scanner" {
-    helmer set kubewarden-controller --set auditScanner.cronJob.schedule="*/30 * * * *"
+    helmer set admission-controller --set auditScanner.cronJob.schedule="*/30 * * * *"
     run kubectl get cronjob -n $NAMESPACE
     assert_output -p audit-scanner
     assert_output -p "*/30 * * * *"

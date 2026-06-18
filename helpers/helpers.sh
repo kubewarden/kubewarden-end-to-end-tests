@@ -149,7 +149,7 @@ function policyserver_yaml {
     if is_appco; then
         image="dp.apps.rancher.io/containers/kubewarden-policy-server:$(helm get values -a -n kubewarden ssac -o json | jq -er '."kubewarden-defaults".policyServer.image.tag')"
     else
-        image="ghcr.io/$(helm get values -a kubewarden-controller -n kubewarden -o json | jq -er '.policyServer.image | .repository + ":"+ .tag')"
+        image="ghcr.io/$(helm get values -a admission-controller -n kubewarden -o json | jq -er '.policyServer.image | .repository + ":"+ .tag')"
     fi
 
     cat - <<EOF

@@ -40,7 +40,7 @@ teardown_file() {
     # Clean up second PolicyServer
     kubectl delete policyserver user-ps --ignore-not-found
     # Reset kubewarden to defaults
-    helmer reset kubewarden-controller
+    helmer reset admission-controller
 }
 
 # create_policyserver_with_ports <name> <webhookPort> <readinessProbePort>
@@ -68,7 +68,7 @@ create_policyserver_with_ports() {
     # IMPORTANT: set custom ports on defaults BEFORE enabling hostNetwork on
     # the controller, so the reconciler never creates a PS with default ports
     # that would collide on the host.
-    helmer set kubewarden-controller --set hostNetwork=true \
+    helmer set admission-controller --set hostNetwork=true \
         --set ports.webhook=63000 \
         --set ports.healthProbe=63001 \
         --set ports.metrics=63002 \
@@ -76,10 +76,10 @@ create_policyserver_with_ports() {
         --set policyServer.readinessProbePort=63003 \
         --set policyServer.webhookPort=64005 \
 
-    wait_rollout deployment/kubewarden-controller
+    wait_rollout deployment/admission-controller
 
     # Verify hostNetwork is enabled on both controller and policy-server
-    assert_deployment_hostnetwork "app.kubernetes.io/name=kubewarden-controller" "true"
+    assert_deployment_hostnetwork "app.kubernetes.io/name=admission-controller" "true"
     assert_deployment_hostnetwork "kubewarden/policy-server=default" "true"
 
     # Verify DNS policy is set correctly for hostNetwork pods
@@ -102,21 +102,21 @@ create_policyserver_with_ports() {
 @test "$(tfile) Controller port change with hostNetwork enabled" {
     # Change ALL three controller ports while hostNetwork is active.
     # All ports must change together to avoid bind conflicts during rollout.
-    helmer set kubewarden-controller \
+    helmer set admission-controller \
         --set ports.webhook=63100 \
         --set ports.healthProbe=63101 \
         --set ports.metrics=63102
-    wait_rollout deployment/kubewarden-controller
+    wait_rollout deployment/admission-controller
 
     # Verify the controller container port changed
     local container_port
-    container_port=$(kubectl get deployment -n "$NAMESPACE" kubewarden-controller \
+    container_port=$(kubectl get deployment -n "$NAMESPACE" admission-controller \
         -o jsonpath='{.spec.template.spec.containers[0].ports[?(@.name=="webhook-server")].containerPort}')
     [[ "$container_port" == "63100" ]]
 
     # Verify the webhook service targetPort changed
     local target_port
-    target_port=$(kubectl get svc -n "$NAMESPACE" kubewarden-controller-webhook-service \
+    target_port=$(kubectl get svc -n "$NAMESPACE" admission-controller-webhook-service \
         -o jsonpath='{.spec.ports[0].targetPort}')
     [[ "$target_port" == "63100" ]]
 
@@ -201,15 +201,15 @@ create_policyserver_with_ports() {
 
     # Disable hostNetwork AND change all controller ports in one upgrade.
     # All ports must change together to avoid bind conflicts during rollout.
-    helmer set kubewarden-controller --set hostNetwork=false \
+    helmer set admission-controller --set hostNetwork=false \
         --set ports.webhook=63200 \
         --set ports.healthProbe=63201 \
         --set ports.metrics=63202
-    wait_rollout deployment/kubewarden-controller
+    wait_rollout deployment/admission-controller
     wait_policyserver default
 
     # Verify hostNetwork is disabled
-    assert_deployment_hostnetwork "app.kubernetes.io/name=kubewarden-controller" "false"
+    assert_deployment_hostnetwork "app.kubernetes.io/name=admission-controller" "false"
     assert_deployment_hostnetwork "kubewarden/policy-server=default" "false"
 
     # Verify DNS policy reverted from ClusterFirstWithHostNet
