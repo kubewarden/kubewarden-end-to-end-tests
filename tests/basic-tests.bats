@@ -35,37 +35,32 @@ helm_get() {
 @test "$(tfile) Version checks" {
     # Helm app version is consistent
     helm list -n "$NAMESPACE" -o json | jq 'map(.app_version) | unique | length == 1'
-    # Check auto-install annotation
-    test "$(helm_get kubewarden-controller '.annotations["catalog.cattle.io/auto-install"] | split("=")[1]')" = "$(helm_get kubewarden-crds '.version')"
-    test "$(helm_get kubewarden-defaults '.annotations["catalog.cattle.io/auto-install"] | split("=")[1]')" = "$(helm_get kubewarden-crds '.version')"
 
     # Hauler manifest versions for PRs
     if [[ "$CHARTS_LOCATION" == */* ]]; then
         # Get versions from upstream policy-reporter
         local polrep_ver polrep_url
-        polrep_ver=$(helm_get kubewarden-controller '.dependencies[] | select(.name=="policy-reporter").version')
+        polrep_ver=$(helm_get admission-controller '.dependencies[] | select(.name=="policy-reporter").version')
         polrep_url=https://github.com/kyverno/policy-reporter/releases/download/policy-reporter-$polrep_ver/policy-reporter-$polrep_ver.tgz
 
         # Helm Charts
-        for chart in kubewarden-crds kubewarden-controller kubewarden-defaults; do
-            test "$(haul_get kubewarden-helm-charts $chart)" = "$(helm_get $chart '.version')"
-        done
+        test "$(haul_get kubewarden-helm-charts admission-controller)" = "$(helm_get admission-controller '.version')"
         test "$(haul_get kubewarden-helm-charts policy-reporter)" = "$polrep_ver"
-        test "$(haul_get kubewarden-helm-charts openreports)" = "$(helm_get kubewarden-crds '.dependencies[] | select(.name=="openreports").version')"
+        test "$(haul_get kubewarden-helm-charts openreports)" = "$(helm_get admission-controller '.dependencies[] | select(.name=="openreports").version')"
 
         # Signed images
-        test "$(haul_get kubewarden-container-images adm-controller/controller)" = "$(helm_get kubewarden-controller '.image.tag')"
-        test "$(haul_get kubewarden-container-images adm-controller/audit-scanner)" = "$(helm_get kubewarden-controller '.auditScanner.image.tag')"
-        test "$(haul_get kubewarden-container-images adm-controller/policy-server)" = "$(helm_get kubewarden-defaults '.policyServer.image.tag')"
+        test "$(haul_get kubewarden-container-images adm-controller/controller)" = "$(helm_get admission-controller '.image.tag')"
+        test "$(haul_get kubewarden-container-images adm-controller/audit-scanner)" = "$(helm_get admission-controller '.auditScanner.image.tag')"
+        test "$(haul_get kubewarden-container-images adm-controller/policy-server)" = "$(helm_get admission-controller '.policyServer.image.tag')"
 
         # Unsigned images
         test "$(haul_get kubewarden-not-signed-images policy-reporter)" = "$(helm show chart $polrep_url | yq -e '.appVersion')"
         test "$(haul_get kubewarden-not-signed-images policy-reporter-ui)" = "$(helm show values $polrep_url | yq -e '.ui.image.tag')"
-        test "$(haul_get kubewarden-not-signed-images rancher/kuberlr-kubectl)" = "$(helm_get kubewarden-controller '.preDeleteJob.image.tag')"
+        test "$(haul_get kubewarden-not-signed-images rancher/kuberlr-kubectl)" = "$(helm_get admission-controller '.preDeleteJob.image.tag')"
         # Policies
         for policy in allow-privilege-escalation-psp capabilities-psp host-namespaces-psp hostpaths-psp pod-privileged user-group-psp; do
             test "$(haul_get kubewarden-policies $policy)" \
-                = "$(helm_get kubewarden-defaults | p=$policy yq '.recommendedPolicies[].module? | select(.repository == "*"+env(p)).tag')"
+                = "$(helm_get admission-controller | p=$policy yq '.recommendedPolicies[].module? | select(.repository == "*"+env(p)).tag')"
         done
     fi
 }
@@ -122,8 +117,8 @@ helm_get() {
 }
 
 @test "$(tfile) Deleting a PolicyServer keeps its policies in Scheduled status" {
-    if helm get values -n $NAMESPACE kubewarden-controller -o json | jq -e '.image.tag != "latest"'; then
-        skip "Trigger only on adm-controller until 1.36.0 release"
+    if helm get values -n $NAMESPACE admission-controller -o json | jq -e '.image.tag != "latest"'; then
+        skip "Trigger only on admission-controller until 1.36.0 release"
     fi
 
     local ps=e2e-scheduled

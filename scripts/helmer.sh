@@ -48,17 +48,14 @@ APPCO="${APPCO:-}"
 # - next: last version from helm search kubewarden --devel
 # - prev: previous stable version (older than next and not -rc)
 # - v\d*: Helm app version: v1.17.0-rc2, 1.17 (autocompleted)
-# - local: directory with kw charts (kubewarden-crds, kubewarden-controller, kubewarden-defaults)
+# - local: directory with kw chart (admission-controller)
 VERSION=${VERSION:-$( [[ "$CHARTS_LOCATION" == */* ]] && echo "local" || echo "next" )}
 
 # Extra parameters for helm install
-CRDS_ARGS="${CRDS_ARGS:-}"
 CONTROLLER_ARGS="${CONTROLLER_ARGS:-}"
-DEFAULTS_ARGS="${DEFAULTS_ARGS:-}"
 # Use latest tag for main images
 if [ -n "${LATEST:-}" ]; then
-    DEFAULTS_ARGS="--set policyServer.image.tag=latest $DEFAULTS_ARGS"
-    CONTROLLER_ARGS="--set image.tag=latest --set auditScanner.image.tag=latest $CONTROLLER_ARGS"
+    CONTROLLER_ARGS="--set image.tag=latest --set auditScanner.image.tag=latest --set policyServer.image.tag=latest $CONTROLLER_ARGS"
 fi
 # Use mTLS parameters
 if [ -n "${MTLS:-}" ]; then
@@ -73,12 +70,12 @@ APPCO_ARGS="--set global.imagePullSecrets[0]=application-collection ${APPCO_ARGS
 [[ $VERSION =~ ^[1-9] ]] && VERSION="v$VERSION"
 [[ $VERSION =~ ^v[1-9]+\.[0-9]+$ ]] && VERSION="${VERSION}.0"
 # Check if local charts directory exists
-[ "$VERSION" = local ] && test -d "$CHARTS_LOCATION/kubewarden-crds"
+[ "$VERSION" = local ] && test -d "$CHARTS_LOCATION/admission-controller"
 # Check if version is valid
 [[ $VERSION =~ ^(local|next|prev|v[1-9].*)$ ]] || { echo "Bad VERSION: $VERSION"; exit 1; }
 
-# Remove kubewarden- prefix from chart name
-[ $# -gt 1 ] && set -- "$1" "${2/#kubewarden-}" "${@:3}"
+# Remove admission- prefix from chart name
+[ $# -gt 1 ] && set -- "$1" "${2/#admission-}" "${@:3}"
 
 # Second parameter must be short chart name or empty
 [[ ${2:-} =~ ^(crds|controller|defaults|--.+)?$ ]] || { echo "Bad chart: $2"; exit 1; }
@@ -98,9 +95,7 @@ save_env() {
     echo CHARTS_LOCATION=\""$CHARTS_LOCATION"\"
     echo VERSION=\""$VERSION"\"
     # Extra parameters
-    echo CRDS_ARGS=\""$CRDS_ARGS"\"
     echo CONTROLLER_ARGS=\""$CONTROLLER_ARGS"\"
-    echo DEFAULTS_ARGS=\""$DEFAULTS_ARGS"\"
     # Version map
     for key in "${!vMap[@]}"; do
         echo vMap["$key"]=\""${vMap[$key]}"\"
@@ -125,7 +120,7 @@ make_version_map() {
     if [ "$VERSION" != local ]; then
         # Do single helm search query to speed up the process
         helm repo update "$REPO_NAME" >/dev/null
-        helm search repo --fail-on-no-result "$REPO_NAME/kubewarden-" --versions --devel -o json \
+        helm search repo --fail-on-no-result "$REPO_NAME/admission-" --versions --devel -o json \
             | jq -ec --arg v "$VERSION" '
                 def remap(items): items | unique_by(.name) | map({(.name): .version, app_version: .app_version}) | add;
                 unique_by(.name) as $latest |
@@ -138,14 +133,12 @@ make_version_map() {
 
     # Load app & charts from json into vMap array
     vMap["app"]=$( test "$VERSION" = "local" \
-        && helm show chart "$CHARTS_LOCATION/kubewarden-crds" | yq '.appVersion' \
+        && helm show chart "$CHARTS_LOCATION/admission-controller" | yq '.appVersion' \
         || jq -er --arg k "$VERSION" '.[$k]["app_version"]' "$tempfile" )
 
-    for chart in crds controller defaults; do
-        vMap["$chart"]=$( test "$VERSION" = "local" \
-            && helm show chart "$CHARTS_LOCATION/kubewarden-$chart" | yq '.version' \
-            || jq -er --arg k "$VERSION" --arg c $chart '.[$k]["kubewarden/kubewarden-" + $c]' "$tempfile" )
-    done
+    vMap["controller"]=$( test "$VERSION" = "local" \
+        && helm show chart "$CHARTS_LOCATION/admission-controller" | yq '.version' \
+        || jq -er --arg k "$VERSION" '.[$k]["kubewarden/admission-controller"]' "$tempfile" )
     rm "$tempfile"
 
     if is_appco; then
@@ -164,18 +157,18 @@ make_version_map() {
 
 print_version_map() {
     local out
-    for k in app crds controller defaults ssac; do
+    for k in app controller ssac; do
         [[ -v vMap[$k] ]] && out+="$k:${vMap[$k]} "
     done
     echo -n "${out% }" # Remove trailing space
 }
 
 # release_name_v0() { is_appco && echo ssac || echo "$@"; }
-# Override release name for appco & handle kubewarden- prefix
+# Override release name for appco & handle admission- prefix
 release_name() {
     local out=()
     if is_appco; then echo ssac; else
-        for p; do out+=("kubewarden-${p#kubewarden-}"); done
+        for p; do out+=("admission-${p#admission-}"); done
         echo "${out[@]}"
     fi
 }
@@ -210,7 +203,7 @@ appco_values() {
 # ==================================================================================================
 # Install & Upgrade kubewarden (change chart version)
 
-# Usage: helm_up kubewarden-crds [--params ..]
+# Usage: helm_up admission-controller [--params ..]
 helm_up() {
     local name chart
     name=$(release_name "$1")
@@ -248,17 +241,13 @@ setup_requirements() {
 do_install_basic() {
     echo "Install $VERSION: ($(print_version_map))"
 
-    local argsvar
-    for chart in ${1:-crds controller defaults}; do
-        argsvar=${chart^^}_ARGS
-        helm_up "kubewarden-$chart" --version "${vMap[$chart]}" ${!argsvar} "${@:2}"
-    done
+    local chart=controller
+    local argsvar=${chart^^}_ARGS
+    helm_up "admission-$chart" --version "${vMap[$chart]}" ${!argsvar} "${@:2}"
 
-    if [ "${1:-defaults}" = 'defaults' ]; then
-        # Initial deployment of policy-server-default is created by controller with delay
-        retry "kubectl get -n $NAMESPACE deployment/policy-server-default" 5
-        wait_rollout deployment/policy-server-default
-    fi
+    # Initial deployment of policy-server-default is created by controller with delay
+    retry "kubectl get -n $NAMESPACE deployment/policy-server-default" 5
+    wait_rollout deployment/policy-server-default
 
     return 0
 }
@@ -358,10 +347,10 @@ do_upgrade() {
     echo "Upgrade to $VERSION:($(print_version_map))"
 
     local rel_short argsvar
-    local releases=${*:-kubewarden-crds kubewarden-controller kubewarden-defaults}
+    local releases=${*:-admission-controller}
 
     for rel in $(release_name $releases); do
-        rel_short=${rel#kubewarden-}
+        rel_short=${rel#admission-}
         argsvar=${rel_short^^}_ARGS
 
         # Look into --reset-then-reuse-values helm flag as replacement
@@ -386,7 +375,7 @@ do_uninstall() {
 
     local names=${*/#-*}
     local flags=${*/#[!-]*}
-    names=$(release_name ${names:-kubewarden-defaults kubewarden-controller kubewarden-crds})
+    names=$(release_name ${names:-admission-controller})
 
     echo "Uninstall: $names $flags"
     helm uninstall $names -n "$NAMESPACE" --wait $flags
@@ -395,7 +384,7 @@ do_uninstall() {
 # Modify installed chart values & keep version
 do_set() {
     local release version
-    release="kubewarden-$1"
+    release="admission-$1"
 
     local -a args=("${@:2}")
     is_appco && readarray -d '' args < <(appco_values $release "${args[@]}")
@@ -404,7 +393,7 @@ do_set() {
     helm_up "$release" --version "$version" --reuse-values "${args[@]}"
 
     [[ "$1" == 'controller' ]] && sleep 20 # Wait for reconciliation
-    [[ "$1" =~ (controller|default|ssac) ]] && wait_rollout deployment/policy-server-default
+    [[ "$1" =~ (controller|ssac) ]] && wait_rollout deployment/policy-server-default
     return 0
 }
 
@@ -413,7 +402,7 @@ do_reset() {
     release=$(release_name "$1")
     version=$(release_version "$release")
 
-    local rel_short=${release#kubewarden-}
+    local rel_short=${release#admission-}
     local argsvar=${rel_short^^}_ARGS
 
     helm_up "$release" --version "$version" --reset-values ${!argsvar} "${@:2}"
@@ -444,10 +433,8 @@ case $1 in
     in|install)
         # Transform args for appco chart
         if [ -n "${APPCO:-}" ]; then
-            CRDS_ARGS=${CRDS_ARGS//--set /--set kubewarden-crds.}
             CONTROLLER_ARGS=${CONTROLLER_ARGS//--set /--set kubewarden-controller.}
-            DEFAULTS_ARGS=${DEFAULTS_ARGS//--set /--set kubewarden-defaults.}
-            SSAC_ARGS="$APPCO_ARGS $CRDS_ARGS $CONTROLLER_ARGS $DEFAULTS_ARGS"
+            SSAC_ARGS="$APPCO_ARGS $CONTROLLER_ARGS"
         fi ;;&
     # Build version map of charts
     in|install|up|upgrade|versions)
@@ -477,7 +464,7 @@ case $1 in
         echo "### Helm ls:"
         helm ls -n "$NAMESPACE" -o json | jq ".[].chart"
         echo "### Current charts values:"
-        for chart in $(release_name kubewarden-crds kubewarden-controller kubewarden-defaults); do
+        for chart in $(release_name admission-controller); do
             helm get values ${RANCHER:+rancher-}$chart -n "$NAMESPACE"
         done
         ;;

@@ -9,7 +9,7 @@ setup() {
 teardown_file() {
     teardown_helper
     kubectl delete ps mtls-pserver --ignore-not-found
-    helmer reset kubewarden-controller
+    helmer reset admission-controller
 }
 
 function curlpod { kubectl exec curlpod -- curl -k --no-progress-meter "$@"; }
@@ -37,10 +37,10 @@ function check_service_mtls {
 }
 
 @test "$(tfile) Enable mTLS" {
-    helm get values -n $NAMESPACE kubewarden-controller -o json | jq -e '.mTLS.enable == true' && skip "mTLS was enabled during installation"
+    helm get values -n $NAMESPACE admission-controller -o json | jq -e '.mTLS.enable == true' && skip "mTLS was enabled during installation"
 
     kubectl get cm -n $NAMESPACE mtlscm &>/dev/null || kubectl create cm -n $NAMESPACE mtlscm --from-file="client-ca.crt=$RESOURCES_DIR/mtls/rootCA.crt"
-    helmer set kubewarden-controller --set mTLS.enable=true --set mTLS.configMapName=mtlscm
+    helmer set admission-controller --set mTLS.enable=true --set mTLS.configMapName=mtlscm
 }
 
 @test "$(tfile) Check mTLS" {
@@ -50,7 +50,7 @@ function check_service_mtls {
     kubectl logs -n kubewarden -l kubewarden/policy-server=default | grep -E "certs: Loaded client CA certificates client_ca_certs_added=[1-9]"
 
     # Check what services require certificates
-    check_service_mtls https://kubewarden-controller-webhook-service.kubewarden.svc:443/validate-policies-kubewarden-io-v1-policyserver
+    check_service_mtls https://admission-controller-webhook-service.kubewarden.svc:443/validate-policies-kubewarden-io-v1-policyserver
     check_service_mtls https://policy-server-default.kubewarden.svc:443/validate
     check_service_mtls https://policy-server-mtls-pserver.kubewarden.svc:443/validate
 
@@ -60,10 +60,10 @@ function check_service_mtls {
 }
 
 @test "$(tfile) Disable mTLS" {
-    helmer set kubewarden-controller --set mTLS.enable=false
+    helmer set admission-controller --set mTLS.enable=false
 
     # Talk to services without a certificate
-    curlpod https://kubewarden-controller-webhook-service.kubewarden.svc:443/validate-policies-kubewarden-io-v1-policyserver
+    curlpod https://admission-controller-webhook-service.kubewarden.svc:443/validate-policies-kubewarden-io-v1-policyserver
     curlpod https://policy-server-default.kubewarden.svc:443/validate
     curlpod https://policy-server-mtls-pserver.kubewarden.svc:443/validate
 

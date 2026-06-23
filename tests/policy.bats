@@ -6,15 +6,14 @@ setup() {
 teardown_file() {
     teardown_helper
     kubectl delete ns shouldbeignored --ignore-not-found
-    helmer reset kubewarden-controller
-    helmer reset kubewarden-defaults
+    helmer reset admission-controller
 }
 
 # Number of policies included in the recommended policies
 POLICY_NUMBER=6
 
 @test "$(tfile) Install recommended policies in protect mode" {
-    helmer set kubewarden-defaults \
+    helmer set admission-controller \
         --set recommendedPolicies.enabled=True \
         --set recommendedPolicies.defaultPolicyMode=protect \
         --set recommendedPolicies.skipAdditionalNamespaces[0]='shouldbeignored'
@@ -56,7 +55,7 @@ POLICY_NUMBER=6
 }
 
 @test "$(tfile) Disable recommended policies" {
-    helmer set kubewarden-defaults --set recommendedPolicies.enabled=False
+    helmer set admission-controller --set recommendedPolicies.enabled=False
     kubectl run pod-privileged --image=rancher/pause:3.2 --privileged
     kubectl delete pod pod-privileged
 }
@@ -127,14 +126,14 @@ scaffold() {
     wait_policies
 
     # Both policies are allowed in controller ns
-    helmer set kubewarden-controller --set alwaysAcceptAdmissionReviewsOnDeploymentsNamespace=false
+    helmer set admission-controller --set alwaysAcceptAdmissionReviewsOnDeploymentsNamespace=false
     wait_policies
     run ! kuberun -l denycap=1
     run ! kuberun -n $NAMESPACE -l denycap=1
     run ! kuberun -n $NAMESPACE -l denyap=1
 
     # Policies are not allowed in controller ns
-    helmer set kubewarden-controller --set alwaysAcceptAdmissionReviewsOnDeploymentsNamespace=true
+    helmer set admission-controller --set alwaysAcceptAdmissionReviewsOnDeploymentsNamespace=true
     wait_policies
     kuberun -n $NAMESPACE -l denyap=1,denycap=1
 

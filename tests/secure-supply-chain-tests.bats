@@ -16,7 +16,7 @@ setup() {
 }
 teardown_file() {
     teardown_helper
-    helmer reset kubewarden-defaults
+    helmer reset admission-controller
     kubectl delete configmap -n $NAMESPACE $CONFIGMAP_NAME --ignore-not-found
 }
 
@@ -40,7 +40,7 @@ function get_policy_server_status {
 @test "$(tfile) Enable" {
     # policyserver needs configmap to start in verification mode
     create_configmap <(kwctl scaffold verification-config)
-    helmer set kubewarden-defaults --set policyServer.verificationConfig=$CONFIGMAP_NAME
+    helmer set admission-controller --set policyServer.verificationConfig=$CONFIGMAP_NAME
     kubectl get policyserver default -o json | jq -e --arg cmname $CONFIGMAP_NAME '.spec.verificationConfig == $cmname'
 }
 

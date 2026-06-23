@@ -12,7 +12,7 @@ teardown_file() {
 }
 
 @test "$(tfile) Reconfigure Kubewarden stack" {
-    helmer set kubewarden-controller --values=$RESOURCES_DIR/reconfiguration-values.yaml
+    helmer set admission-controller --values=$RESOURCES_DIR/reconfiguration-values.yaml
     wait_for --for=condition="PolicyActive" clusteradmissionpolicies --all
 }
 

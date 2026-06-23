@@ -27,7 +27,7 @@ function assert_cronjob {
 }
 
 @test "$(tfile) Reconfigure audit scanner" {
-    helmer set kubewarden-controller --set auditScanner.cronJob.schedule="*/30 * * * *"
+    helmer set admission-controller --set auditScanner.cronJob.schedule="*/30 * * * *"
     run kubectl get cronjob -n $NAMESPACE
     assert_output -p audit-scanner
     assert_output -p "*/30 * * * *"
@@ -46,8 +46,7 @@ function assert_cronjob {
     assert_crds true
 
     # Install kubewarden with existing policyreport crds
-    helmer reinstall crds --set installOpenReportsCRDs=False
-    helmer reinstall controller
+    helmer reinstall controller --set installOpenReportsCRDs=False
     assert_cronjob true
 
     # Check policy reports did not come from helm (have no labels)
