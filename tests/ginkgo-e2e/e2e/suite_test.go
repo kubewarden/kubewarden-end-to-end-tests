@@ -51,7 +51,7 @@ var (
 	capabilitiesPolicyVersion             string
 	hostNamespacePolicyVersion            string
 	hostPathsPolicyVersion                string
-	kubewardenControllerVersion           string
+	admControllerVersion                  string
 	k3sVersion                            string
 	podPrivilegedPolicyVersion            string
 	policyServerVersion                   string
@@ -291,7 +291,7 @@ var _ = BeforeSuite(func() {
 	podPrivilegedPolicyVersion = os.Getenv("POD_PRIVILEGED_PSP_VERSION")
 	userGroupPolicyVersion = os.Getenv("USER_GROUP_PSP_VERSION")
 	backupRestoreVersion = os.Getenv("BACKUP_RESTORE_VERSION")
-	kubewardenControllerVersion = os.Getenv("KUBEWARDEN_CONTROLLER_VERSION")
+	admControllerVersion = os.Getenv("ADM_CONTROLLER_VERSION")
 	policyServerVersion = os.Getenv("POLICY_SERVER_VERSION")
 	k3sVersion = os.Getenv("INSTALL_K3S_VERSION")
 	netDefaultFileName = "../assets/net-default-airgap.xml"

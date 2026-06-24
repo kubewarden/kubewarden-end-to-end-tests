@@ -33,12 +33,10 @@ helm repo add chartmuseum http://localhost:8080
 
 # Push helm charts to local repo
 cd ../../../charts
-helm cm-push kubewarden-crds chartmuseum
-helm cm-push kubewarden-controller chartmuseum
-helm cm-push kubewarden-defaults chartmuseum
+helm cm-push adm-controller chartmuseum
 
 # Update the hauler manifest with the new repo
-for chart in kubewarden-crds kubewarden-controller kubewarden-defaults; do
+for chart in admission-controller; do
   yq -i '
     (.spec.charts[] | select(.name == "'"$chart"'").repoURL) = "'"$REPO_URL"'"
   ' $HAULER_MANIFEST
