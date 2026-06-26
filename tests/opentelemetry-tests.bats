@@ -70,9 +70,9 @@ teardown_file() {
     retry "kubectl get pods -n $NAMESPACE -l 'app.kubernetes.io/component in (controller,policy-server)' -o json \
         | jq -e 'all(.items[]; (.spec.initContainers[]?, .spec.containers[]) | select(.name == \"otc-container\"))'"
     # Policy server service has the metrics ports
-    kubectl get services -n $NAMESPACE  policy-server-default -o json | jq -e 'any(.spec.ports[]; .name == "metrics")'
+    retry "kubectl get services -n $NAMESPACE policy-server-default -o json | jq -e 'any(.spec.ports[]; .name == \"metrics\")'" 2 5
     # Controller service has the metrics ports
-    kubectl get services -n $NAMESPACE -l app.kubernetes.io/name=admission-controller -o json | jq -e 'any(.items[].spec.ports[]; .name == "metrics")'
+    retry "kubectl get services -n $NAMESPACE -l app.kubernetes.io/name=admission-controller -o json | jq -e 'any(.items[].spec.ports[]; .name == \"metrics\")'" 2 5
 
     # Generate metric data
     kubectl run pod-privileged --image=rancher/pause:3.2 --privileged
