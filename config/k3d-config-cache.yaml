@@ -13,6 +13,14 @@ kind: Simple
 #         nodeFilters:
 #           - all:*
 
+options:
+  k3s:
+    extraArgs:
+      # enable etcd to avoid read-after-write issues in the audit scanner tests
+      - arg: "--cluster-init"
+        nodeFilters:
+          - all:*
+
 registries:
   create:
     name: k3d-docker.io
