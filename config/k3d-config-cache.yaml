@@ -16,7 +16,7 @@ kind: Simple
 options:
   k3s:
     extraArgs:
-      # enable etcd to avoid read-after-write issues in the audit scanner tests
+      # Enable etcd to avoid read-after-write issues with sqlite (default)
       - arg: "--cluster-init"
         nodeFilters:
           - server:0
