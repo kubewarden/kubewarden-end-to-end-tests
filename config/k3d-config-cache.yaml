@@ -13,6 +13,14 @@ kind: Simple
 #         nodeFilters:
 #           - all:*
 
+options:
+  k3s:
+    extraArgs:
+      # Enable etcd to avoid read-after-write issues with sqlite (default)
+      - arg: "--cluster-init"
+        nodeFilters:
+          - server:0
+
 registries:
   create:
     name: k3d-docker.io
