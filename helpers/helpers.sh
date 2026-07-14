@@ -173,6 +173,8 @@ function create_policyserver {
 # wait_policyserver [name]
 function wait_policyserver {
     local name="${1:-default}"
+    # Wait for deployment to be created
+    retry "kubectl get deploy -n $NAMESPACE policy-server-$name" 5 1
     # Wait for specific revision to prevent changes during rollout
     revision=$(kubectl -n "$NAMESPACE" get "deployment/policy-server-$name" -o json | jq -er '.metadata.annotations."deployment.kubernetes.io/revision"')
     wait_rollout --revision "$revision" "deployment/policy-server-$name"
