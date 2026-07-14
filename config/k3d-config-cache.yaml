@@ -19,7 +19,7 @@ options:
       # enable etcd to avoid read-after-write issues in the audit scanner tests
       - arg: "--cluster-init"
         nodeFilters:
-          - all:*
+          - server:0
 
 registries:
   create:
