@@ -50,8 +50,9 @@ $(foreach var,$(VARIABLES),$(if $(call is_falsy,$(var)),$(eval override $(var)=)
 # Generate target for every test file
 TESTFILES := $(notdir $(wildcard $(TESTS_DIR)/*.bats))
 # Filter out audit-scanner-installation because it reinstalls kubewarden. And,
-# host-network-tests because they are slow
-FILTERED := $(filter-out audit-scanner-installation.bats host-network-tests.bats, $(TESTFILES))
+# host-network-tests because they are slow. And,
+# uninstall-cleanup-tests because it uninstalls and reinstalls kubewarden.
+FILTERED := $(filter-out audit-scanner-installation.bats host-network-tests.bats uninstall-cleanup-tests.bats, $(TESTFILES))
 # Filter out mutual-tls if MTLS is not set
 ifeq ($(MTLS),)
     FILTERED := $(filter-out mutual-tls.bats, $(FILTERED))
