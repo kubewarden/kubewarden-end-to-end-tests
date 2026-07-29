@@ -49,13 +49,18 @@ $(foreach var,$(VARIABLES),$(if $(call is_falsy,$(var)),$(eval override $(var)=)
 
 # Generate target for every test file
 TESTFILES := $(notdir $(wildcard $(TESTS_DIR)/*.bats))
-# Filter out audit-scanner-installation because it reinstalls kubewarden. And,
-# host-network-tests because they are slow
-FILTERED := $(filter-out audit-scanner-installation.bats host-network-tests.bats, $(TESTFILES))
+# Filter out:
+# - audit-scanner-installation because it reinstalls kubewarden
+# - host-network-tests because they are slow
+# - uninstall-tests is re-appended below so it always runs last
+FILTERED := $(filter-out audit-scanner-installation.bats uninstall-tests.bats host-network-tests.bats, $(TESTFILES))
 # Filter out mutual-tls if MTLS is not set
 ifeq ($(MTLS),)
     FILTERED := $(filter-out mutual-tls.bats, $(FILTERED))
 endif
+# Run uninstall-tests last: it uninstalls kubewarden and doubles as the suite
+# cleanup, failing if any test left resources behind
+FILTERED += uninstall-tests.bats
 # Remove requested .bats targets from FILTERED to avoid duplicates
 FILTERED := $(filter-out $(filter %.bats,$(MAKECMDGOALS)), $(FILTERED))
 
@@ -66,6 +71,9 @@ BATS_SELECTED := $(strip $(foreach goal,$(MAKECMDGOALS),\
     $(if $(filter %.bats,$(goal)),$(goal)))))
 # If no goals specified, use filtered tests
 BATS_SELECTED := $(or $(BATS_SELECTED),$(FILTERED))
+# uninstall-tests removes kubewarden (incl. CRDs): whenever selected, always
+# run it last, regardless of the goal order on the command line
+BATS_SELECTED := $(filter-out uninstall-tests.bats,$(BATS_SELECTED)) $(filter uninstall-tests.bats,$(BATS_SELECTED))
 
 # ==================================================================================================
 # Use .run-bats to call bats only once per execution. Required to abort tests on failure
