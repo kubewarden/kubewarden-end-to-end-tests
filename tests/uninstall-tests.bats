@@ -35,15 +35,9 @@ setup() {
 
     # Version check and pod wait only make sense while kubewarden is still
     # installed.
-    #
-    # Pre-delete hook controller cleanup was introduced in Kubewarden 1.37.
-    # Remember the skip-version decision, since later tests run after the
-    # uninstall and cannot check it anymore.
     if helm status -n "$NAMESPACE" admission-controller &>/dev/null; then
-        kw_version ">=1.37" || touch "$BATS_FILE_TMPDIR/.skip-version"
         wait_pods -n "$NAMESPACE"
     fi
-    [ ! -f "$BATS_FILE_TMPDIR/.skip-version" ] || skip "Requires admission-controller >= 1.37.0"
 }
 
 TEST_FINALIZER=e2e.kubewarden.io/test-finalizer
