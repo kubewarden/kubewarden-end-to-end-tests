@@ -176,39 +176,23 @@ func InstallKubewarden(k *kubectl.Kubectl) {
 	// Default chart
 	chartRepo := "kubewarden"
 
-	for _, chart := range []string{"kubewarden-crds", "kubewarden-controller", "kubewarden-defaults"} {
-		// Set the filename in chart if a custom version is defined
-		chartName := chart
-
-		// Global installation flags
-		flags := []string{
-			"upgrade", "--install", chart, chartRepo + "/" + chartName,
-			"--namespace", "kubewarden",
-			"--create-namespace",
-			"--wait", "--wait-for-jobs",
-		}
-
-		// Add specific options for the rancher-backup chart
-		if chart == "kubewarden-controller" {
-			flags = append(flags,
-				"--set", "auditScanner.policyReporter=true",
-				"--set", "auditScanner.cronJob.schedule=*/2 * * * *",
-				"--set", "auditScanner.reportCRDsKind=openreports",
-			)
-		}
-
-		if chart == "kubewarden-defaults" {
-			flags = append(flags,
-				"--set", "recommendedPolicies.enabled=true",
-			)
-		}
-		RunHelmCmdWithRetry(flags...)
+	// Set flags for admission controller installation
+	flags := []string{
+		"upgrade", "--install", "admission-controller", chartRepo + "/admission-controller",
+		"--namespace", "kubewarden",
+		"--create-namespace",
+		"--set", "auditScanner.policyReporter=true",
+		"--set", "auditScanner.cronJob.schedule=*/2 * * * *",
+		"--set", "auditScanner.reportCRDsKind=openreports",
+		"--set", "recommendedPolicies.enabled=true",
+		"--wait", "--wait-for-jobs",
 	}
+		RunHelmCmdWithRetry(flags...)
 
 	// Wait for all pods to be started
 	checkList := [][]string{
-		{"kubewarden", "app.kubernetes.io/name=kubewarden-controller"},
-		{"kubewarden", "app.kubernetes.io/name=policy-server"},
+		{"kubewarden", "app.kubernetes.io/name=admission-controller"},
+		{"kubewarden", "app.kubernetes.io/component=policy-server"},
 	}
 	err := rancher.CheckPod(k, checkList)
 	Expect(err).To(Not(HaveOccurred()))
