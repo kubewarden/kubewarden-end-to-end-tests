@@ -1,6 +1,3 @@
-# Configure pull-through cache for DockerHub and GHCR
-# https://k3d.io/v5.8.3/usage/registries/#creating-a-registry-proxy-pull-through-registry
-
 apiVersion: k3d.io/v1alpha5
 kind: Simple
 
@@ -20,6 +17,12 @@ options:
       - arg: "--cluster-init"
         nodeFilters:
           - server:0
+
+# SUSE_Trust_Root from ca-certificates-suse package
+volumes:
+  - volume: $PWD/config/SUSE_Trust_Root.crt.pem:/etc/ssl/certs/SUSE_Trust_Root.crt.pem
+    nodeFilters:
+      - all:*
 
 registries:
   create:
@@ -45,3 +48,13 @@ registries:
       "ghcr.io":
         endpoint:
           - http://k3d-ghcr.io:5000
+
+      "registry.suse.de":
+        endpoint:
+          - https://registry.suse.de/v2
+    configs:
+      "registry.suse.de":
+        tls:
+          # insecure_skip_verify: true (alternative)
+          ca_file: /etc/ssl/certs/SUSE_Trust_Root.crt.pem
+

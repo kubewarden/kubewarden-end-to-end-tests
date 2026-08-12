@@ -39,7 +39,7 @@ if [ "${1:-}" == 'create' ]; then
 
     # /dev/mapper: https://k3d.io/v5.7.4/faq/faq/#issues-with-btrfs
     k3d cluster create "$CLUSTER_NAME" --wait \
-        --config config/k3d-config-cache.yaml \
+        --config config/k3d-config.yaml \
         --image "rancher/k3s:$K3S" \
         -s "$MASTER_COUNT" -a "$WORKER_COUNT" \
         -v "/dev/mapper:/dev/mapper@all:*" \
