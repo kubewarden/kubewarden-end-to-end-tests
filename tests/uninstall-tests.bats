@@ -2,8 +2,6 @@
 
 # Tests for the pre-delete-hook of the admission-controller uninstall
 # that runs the controller image in cleanup mode.
-# These tests also double as testsuite cleanup step, deleting CRs and CRDs at
-# the end.
 #
 # The uninstall must leave behind ONLY the Kubewarden CRDs and the
 # user-defined PolicyServer/policy CRs (with the Kubewarden finalizers
@@ -15,29 +13,11 @@
 # For that, we add a test Finalizer that simulates third-party tooling: the
 # cleanup must keep it in place and must not hang waiting on resources it does
 # not own (the deletion is issued and the cleanup moves on). The finalizer is
-# released again by the escape hatch testcase, and the final testcase fails if
-# ANY Kubewarden resource (other than the CRDs) is still around. This file thus
-# doubles as the suite cleanup: run it last, there is no separate teardown to
-# reinstall or to sweep leftovers, so incomplete cleanup cannot be masked.
-#
-# As a cleanup step, the testcase is idempotent: on a re-run against an already
-# uninstalled cluster the install-dependent tests skip, the escape hatch
-# no-ops, and the final leftover audit re-runs and enforces the clean state.
+# released again in a later testcase, and the final testcase fails if ANY
+# Kubewarden resource (other than the CRDs) is still around.
 
-# Waiting for pods with wait_pods only makes sense while Kubewarden is
-# installed (the first run of this testcase/cleanup). Subsequent runs would
-# hang until timeout.
-# Therefore, all tests are tagged `setup:--no-wait` which disables the generic
-# wait_pods in setup_helper(), and a replacement wait_pods is inside the
-# setup(), only run when there's an installed admission-controller.
 setup() {
     setup_helper
-
-    # Version check and pod wait only make sense while kubewarden is still
-    # installed.
-    if helm status -n "$NAMESPACE" admission-controller &>/dev/null; then
-        wait_pods -n "$NAMESPACE"
-    fi
 }
 
 TEST_FINALIZER=e2e.kubewarden.io/test-finalizer
@@ -45,10 +25,10 @@ PS_NAME=e2e-uninstall
 POLICY_NAME=safe-labels-for-pods
 
 # add_test_finalizer <kind> <name> [-n namespace]
-# Idempotent: does nothing if the finalizer is already set (the API server
-# rejects duplicate finalizers).
-# Also works when the resource has no finalizers array yet
-# (a JSON-patch "add /metadata/finalizers/-" would fail on those).
+# Idempotent: does nothing if the finalizer is set (the API server rejects
+# duplicate finalizers).
+# Uses a merge patch: a JSON-patch "add /metadata/finalizers/-" would fail
+# on resources without a finalizers array.
 add_test_finalizer() {
     local finalizers
     finalizers=$(kubectl get "$1" "$2" "${@:3}" -o json |
@@ -65,16 +45,8 @@ release_test_finalizer() {
     kubectl patch "$1" "$2" "${@:3}" --type=merge -p "{\"metadata\":{\"finalizers\":$finalizers}}"
 }
 
-# Skip tests if no installed kubewarden, so the whole file is idempotent and
-# converges on the final audit.
-skip_uninstalled() {
-    helm status -n "$NAMESPACE" admission-controller &>/dev/null || skip "kubewarden is not installed"
-}
-
-# bats test_tags=setup:--no-wait
 @test "$(tfile) Prepare user resources with test finalizers" {
     # test requires an installed kubewarden
-    skip_uninstalled
 
     # User-defined PolicyServer with a policy assigned to it
     create_policyserver $PS_NAME
@@ -96,11 +68,10 @@ skip_uninstalled() {
     add_test_finalizer configmap policy-server-$PS_NAME -n "$NAMESPACE"
 }
 
-# bats test_tags=setup:--no-wait
 @test "$(tfile) Uninstall runs the pre-delete hook cleanup" {
     # test requires an installed kubewarden
-    skip_uninstalled
 
+    # uninstall admission-controller
     helmer uninstall
 
     # The pre-delete Job is removed on success (hook-delete-policy: hook-succeeded)
@@ -147,10 +118,11 @@ skip_uninstalled() {
     kubectl wait --for=delete --timeout=60s pods -A -l app.kubernetes.io/part-of=kubewarden
 }
 
+# kubewarden is uninstalled: skip the pods wait, it hangs on an empty namespace
 # bats test_tags=setup:--no-wait
-@test "$(tfile) Escape hatch: resources are deletable once finalizers are released" {
+@test "$(tfile) Resources are deletable once finalizers are released" {
     # Releasing the test finalizer completes the ConfigMap deletion issued
-    # by the cleanup (already-gone means success, so this is re-run safe).
+    # by the cleanup
     release_test_finalizer configmap policy-server-$PS_NAME -n "$NAMESPACE"
     kubectl wait --for=delete --timeout=30s configmap policy-server-$PS_NAME -n "$NAMESPACE"
 
@@ -161,6 +133,7 @@ skip_uninstalled() {
     kubectl delete --ignore-not-found --timeout=30s ps $PS_NAME
 }
 
+# kubewarden is uninstalled: skip the pods wait, it hangs on an empty namespace
 # bats test_tags=setup:--no-wait
 @test "$(tfile) Nothing is left over after the uninstall" {
     # No Helm releases are left in the namespace
@@ -170,12 +143,8 @@ skip_uninstalled() {
     # No Kubewarden CRs are left: the previous testcases removed the
     # intentionally kept user CRs, and every other CR created by the test
     # suite or the charts must be gone.
-    # On a re-run the CRDs were already removed below, and no CRs can exist
-    # without them.
-    if kubectl get crds policyservers.policies.kubewarden.io &>/dev/null; then
-        run kubectl get ps,ap,cap,apg,capg -A
-        assert_output -p "No resources found"
-    fi
+    run kubectl get ps,ap,cap,apg,capg -A
+    assert_output -p "No resources found"
 
     # Nothing labeled as part of Kubewarden survived, namespaced...
     run kubectl get all,jobs,secrets,configmaps,pdb,serviceaccounts,leases -A -l app.kubernetes.io/part-of=kubewarden
@@ -189,13 +158,13 @@ skip_uninstalled() {
     run kubectl get all,secrets,configmaps,pdb -A -l app.kubernetes.io/component=policy-server
     assert_output -p "No resources found"
 
-    # Only the CRDs remain, kept on purpose for re-installation.
+    # Only the CRDs remain, kept on purpose for re-installation
     local crds
-    crds=$(kubectl get crds -o name | grep '\.kubewarden\.io$' || true)
-    [ -z "$crds" ] || [ "$(wc -l <<<"$crds")" -eq 5 ] # the 5 policies CRDs, nothing else
+    crds=$(kubectl get crds -o name | grep '\.kubewarden\.io$')
+    [ "$(wc -l <<<"$crds")" -eq 5 ] # the 5 kubewarden CRDs, nothing else
 
-    # Remove CRDs and CRs for a complete cleanup
-    [ -z "$crds" ] || kubectl delete --timeout=60s $crds
+    # Remove the CRDs for a complete cleanup
+    kubectl delete --timeout=60s $crds
 
     # Nothing Kubewarden-related is left in the cluster
     run kubectl get crds -o name
