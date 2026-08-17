@@ -19,6 +19,9 @@
 setup() {
     setup_helper
 }
+teardown_file() {
+    teardown_helper
+}
 
 TEST_FINALIZER=e2e.kubewarden.io/test-finalizer
 PS_NAME=e2e-uninstall
@@ -129,8 +132,8 @@ release_test_finalizer() {
     release_test_finalizer ps $PS_NAME
 
     # Without a running controller, plain kubectl delete must complete on its own
-    kubectl delete --ignore-not-found --timeout=30s cap $POLICY_NAME
-    kubectl delete --ignore-not-found --timeout=30s ps $PS_NAME
+    kubectl delete --timeout=30s cap $POLICY_NAME
+    kubectl delete --timeout=30s ps $PS_NAME
 }
 
 # kubewarden is uninstalled: skip the pods wait, it hangs on an empty namespace
@@ -169,4 +172,7 @@ release_test_finalizer() {
     # Nothing Kubewarden-related is left in the cluster
     run kubectl get crds -o name
     refute_output -p kubewarden.io
+
+    # Return to initial state
+    helmer reinstall
 }
