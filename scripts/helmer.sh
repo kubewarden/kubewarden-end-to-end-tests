@@ -53,10 +53,18 @@ VERSION=${VERSION:-$( [[ "$CHARTS_LOCATION" == */* ]] && echo "local" || echo "n
 
 # Extra parameters for helm install
 CONTROLLER_ARGS="${CONTROLLER_ARGS:-}"
-# Use latest tag for main images
-if [ -n "${LATEST:-}" ]; then
-    CONTROLLER_ARGS="--set image.tag=latest --set auditScanner.image.tag=latest --set policyServer.image.tag=latest $CONTROLLER_ARGS"
+
+# Customize repository/tag for main images
+[ -n "${LATEST:-}" ] && TAG=latest
+
+# Use kubewarden/adm-controller-fork
+if [ -n "${REPO:-}" ]; then
+    CONTROLLER_ARGS="--set image.repository=$REPO/controller --set auditScanner.image.repository=$REPO/audit-scanner --set policyServer.image.repository=$REPO/policy-server $CONTROLLER_ARGS"
 fi
+if [ -n "${TAG:-}" ]; then
+    CONTROLLER_ARGS="--set image.tag=$TAG --set auditScanner.image.tag=$TAG --set policyServer.image.tag=$TAG $CONTROLLER_ARGS"
+fi
+
 # Use mTLS parameters
 if [ -n "${MTLS:-}" ]; then
     CONTROLLER_ARGS="--set mTLS.enable=true --set mTLS.configMapName=mtlscm $CONTROLLER_ARGS"
