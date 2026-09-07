@@ -3,7 +3,7 @@ set -aeEuo pipefail
 trap 'echo "Error on ${BASH_SOURCE/$PWD/.}:${LINENO} $(sed -n "${LINENO} s/^\s*//p" $PWD/${BASH_SOURCE/$PWD})"' ERR
 
 # Optional variables
-K3S=${K3S:-$(kubectl version --client -o json | jq -r '.clientVersion | .major+"."+.minor')}
+K3S=${K3S:-$(k3d version list k3s -l1)}
 CLUSTER_NAME=${CLUSTER_NAME:-k3s-default}
 MASTER_COUNT=${MASTER_COUNT:-1}
 WORKER_COUNT=${WORKER_COUNT:-0}
@@ -22,7 +22,7 @@ if [ "${1:-}" == 'create' ]; then
     [ -v DRY ] || { precheck cluster || exit 1; }
 
     # Complete partial K3S version from dockerhub v1.30 -> v1.30.5-k3s1
-    if [[ ! $K3S =~ ^v[0-9.]+-k3s[0-9]$ ]]; then
+    if [[ ! $K3S =~ ^v[0-9.]+.*-k3s[0-9]$ ]]; then
         K3S=$(curl -L -s "https://registry.hub.docker.com/v2/repositories/rancher/k3s/tags?page_size=20&name=$K3S" | jq -re 'first(.results[].name | select(test("^v[0-9.]+-k3s[0-9]$")))')
         echo "K3S version: $K3S"
     fi
