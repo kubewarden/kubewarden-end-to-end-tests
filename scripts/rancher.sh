@@ -46,6 +46,7 @@ create_k3d_cluster() {
         2.13*) k8s="v1.34" ;; # v1.32 - v1.34
         2.14*) k8s="v1.35" ;; # v1.33 - v1.35
         2.15*) k8s="v1.36" ;; # v1.34 - v1.36
+        2.16*) k8s="v1.37" ;; # v1.35 - v1.37
     esac
     K3S="${K3S:-$k8s}" "$BASEDIR"/cluster_k3d.sh create "${@:2}"
 }
