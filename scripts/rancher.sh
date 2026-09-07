@@ -119,10 +119,16 @@ find_chart_by_constraints () {
 # Wait for Rancher pods
 wait_for_rancher() {
     for i in {1..20}; do
-        output=$(kubectl get pods --no-headers -o wide -n cattle-system -l app=rancher-webhook | grep -vw Completed || echo 'Wait: cattle-system')$'\n'
+        output=$(kubectl get pods --no-headers -o wide -n cattle-system -l app=rancher-webhook | grep -vw Completed || echo 'Wait: rancher-webhook')$'\n'
         output+=$(kubectl get pods --no-headers -o wide -n cattle-system | grep -vw Completed || echo 'Wait: cattle-system')$'\n'
         output+=$(kubectl get pods --no-headers -o wide -n cattle-fleet-system | grep -vw Completed || echo 'Wait: cattle-fleet-system')$'\n'
-        grep -vE '([0-9]+)/\1 +Running|^$' <<< "$output" || break
+
+        # Rancher startup completed when all pods are running (or failed)
+        grep -vE -e '([0-9]+)/\1 +Running' -e '^$' -e '^helm-operation.*1/2\s+Error' <<< "$output" || {
+            # Remove fleet helm-operation error pods (UPGRADE FAILED: pre-upgrade hooks failed)
+            awk '$2=="1/2" && $3=="Error" {print $1}' <<< "$output" | xargs -r kubectl delete pod -n cattle-system
+            break
+        }
         [ "$i" -ne 20 ] && sleep 30 || {
             kubectl get pods -n cattle-system;
             kubectl get pods -n cattle-fleet-system;
