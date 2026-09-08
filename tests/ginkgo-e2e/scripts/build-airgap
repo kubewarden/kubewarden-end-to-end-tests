@@ -63,6 +63,10 @@ DEPLOY_AIRGAP_SCRIPT=$(realpath ../scripts/deploy-airgap)
 UPGRADE_AIRGAP_SCRIPT=$(realpath ../scripts/upgrade-airgap)
 K3S_VERSION=$1
 TEST_TYPE=$2
+#RANCHER_IMAGES_FILE="rancher-images.txt"
+RANCHER_IMAGES_FILE=$(realpath ../assets/images-list)
+#RANCHER_LOAD_SCRIPT="rancher-load-images.sh"
+#RANCHER_SAVE_SCRIPT="rancher-save-images.sh"
 
 # Validate required arguments
 if [[ -z "${K3S_VERSION}" ]] || [[ -z "${TEST_TYPE}" ]]; then
@@ -77,6 +81,10 @@ HAULER_MANIFEST="${HAULER_PATH}/hauler_manifest.yaml"
 HAULER_MANIFEST_PREV="${HAULER_PATH}/hauler_manifest_prev.yaml"
 OPT_RANCHER="${HOME}/airgap_rancher"
 REPO_SERVER="rancher-manager.test:5000"
+#IMAGES_PATH="${HOME}/container-images"
+
+# Create directories
+#mkdir -p ${OPT_RANCHER}/{k3s,helm,registry} ${IMAGES_PATH}
 
 # The k3s install.sh is a generic installer: the version it installs is controlled at
 # runtime via the INSTALL_K3S_VERSION environment variable. We therefore always use the
@@ -118,6 +126,81 @@ sudo zypper --no-refresh -n in skopeo yq
 mkdir -p ${OPT_RANCHER}/k3s
 cd ${OPT_RANCHER}
 
+# First we need to move docker directory to ensure that we have enough disk space
+#if [[ ! -d ${HOME}/var-lib-docker ]]; then
+#  sudo systemctl stop docker
+#
+#  # Move the directory
+#  sudo mv /var/lib/docker ${HOME}/var-lib-docker/
+#  sudo ln -s ${HOME}/var-lib-docker /var/lib/docker
+#
+#  # Allow local insecure registry
+#  sudo sed -i 's/^{$/{\n  "insecure-registries": ["rancher-manager.test:5000"],/' /etc/docker/daemon.json
+#
+#  # Restart docker daemon
+#  sudo systemctl start docker
+#  if ! sudo systemctl is-active --quiet docker; then
+#    error "Docker service is not running!"
+#  fi
+#fi
+
+# Get Helm Charts
+#cd ${OPT_RANCHER}/helm/
+
+# Add repos
+RunHelmCmdWithRetry repo add jetstack https://charts.jetstack.io > /dev/null 2>&1
+RunHelmCmdWithRetry repo add rancher-latest https://releases.rancher.com/server-charts/latest > /dev/null 2>&1
+RunHelmCmdWithRetry repo update > /dev/null 2>&1
+
+# Get CertManager chart
+RunHelmCmdWithRetry pull jetstack/cert-manager > /dev/null 2>&1
+
+# Get CertManager version
+CERT_MANAGER_VERSION=$(ls cert-manager-*.tgz 2>/dev/null)
+CERT_MANAGER_VERSION=${CERT_MANAGER_VERSION#cert-manager-*}
+CERT_MANAGER_VERSION=${CERT_MANAGER_VERSION%.*}
+
+# Get Rancher chart
+RunHelmCmdWithRetry pull rancher-latest/rancher > /dev/null 2>&1
+
+# Get Rancher version from the downloaded chart
+RANCHER_VERSION=$(ls rancher-*.tgz 2>/dev/null)
+RANCHER_VERSION=${RANCHER_VERSION#rancher-*}
+RANCHER_VERSION=${RANCHER_VERSION%.*}
+
+# Get container images
+#cd ${IMAGES_PATH}
+
+# Get Rancher images list
+#curl -sOL https://github.com/rancher/rancher/releases/download/v${RANCHER_VERSION}/${RANCHER_IMAGES_FILE}
+
+# Rancher scripts
+#for I in ${RANCHER_LOAD_SCRIPT} ${RANCHER_SAVE_SCRIPT}; do
+#  curl -sOL https://github.com/rancher/rancher/releases/download/v${RANCHER_VERSION}/${I}
+#  chmod +x ${I}
+#
+#  # Workaround to speed up the save/load process
+#  sed -i 's/gzip/pigz --fast/' ${I}
+#done
+
+# CertManager images list
+#RunHelmCmdWithRetry template ${OPT_RANCHER}/cert-manager-${CERT_MANAGER_VERSION}.tgz \
+#  | awk '$1 ~ /image:/ {print $2}' \
+#  | sed s/\"//g >> ${RANCHER_IMAGES_FILE}
+
+# Sort and clean container images list
+#sort -u ${RANCHER_IMAGES_FILE} -o ${RANCHER_IMAGES_FILE}
+
+# Save container images
+#./${RANCHER_SAVE_SCRIPT} --image-list ${RANCHER_IMAGES_FILE}
+
+# Export registry with skopeo
+#cd ${OPT_RANCHER}
+#RunSkopeoCmdWithRetry copy --additional-tag registry:latest docker://registry:latest docker-archive:registry/registry.tar
+
+# Compress all the things but the container images
+#tar -I pzstd -vcf ${OPT_RANCHER%/*}/airgap_rancher.zst $(ls 2>/dev/null)
+
 # Add rancher manager in /etc/hosts
 sudo sh -c "echo '192.168.122.102 ${REPO_SERVER%:*}' >> /etc/hosts"
 
@@ -145,6 +228,11 @@ if [[ "$TEST_TYPE" == "upgrade" ]] ; then
 else
   ${HAULER_BIN} store sync --filename ${HAULER_MANIFEST}
 fi
+
+# Save Rancher images to hauler store
+for images in $(cat ${RANCHER_IMAGES_FILE}); do
+  ${HAULER_BIN} store add image ${images}
+done
 
 # Skopeo - Registry
 # We need this image to build our internal registry
