@@ -4,7 +4,7 @@
 
 # --- Predefine variables ---
 set -l cluster_vars K3S= 'DRY=1' 'MTLS=1' 'KEEP=1'
-set -l helmer_vars 'LATEST=1' 'APPCO=1' VERSION= CRDS_ARGS= CONTROLLER_ARGS= DEFAULTS_ARGS= APPCO_ARGS= CHARTS_LOCATION=
+set -l helmer_vars 'LATEST=1' 'APPCO=1' VERSION= CRDS_ARGS= CONTROLLER_ARGS= DEFAULTS_ARGS= APPCO_ARGS= CHARTS_LOCATION= TAG= REPO=
 
 # # --- Cluster target variables ---
 complete -k -c make -n '__fish_seen_subcommand_from cluster' -d 'Variable' -a "$cluster_vars"  -f
