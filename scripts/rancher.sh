@@ -40,7 +40,6 @@ create_k3d_cluster() {
     local k8s=""
     case "$rancher" in
         # Limit k8s version - https://www.suse.com/suse-rancher/support-matrix
-        2.10*) k8s="v1.31" ;; # v1.28 - v1.31
         2.11*) k8s="v1.32" ;; # v1.30 - v1.32
         2.12*) k8s="v1.33" ;; # v1.31 - v1.33
         2.13*) k8s="v1.34" ;; # v1.32 - v1.34
@@ -52,6 +51,7 @@ create_k3d_cluster() {
 }
 
 # Add rancher repositories
+# https://github.com/rancherlabs/rancher-process/blob/main/docs/processes/releases/rancher/images-locations.md
 helm_add_repositories() {
     ar() { helm repo ls | grep -q "^$1[[:space:]]" || helm repo add "$1" "$2"; }
     ar e2e-jetstack https://charts.jetstack.io
@@ -61,8 +61,9 @@ helm_add_repositories() {
     ar e2e-rancher-community https://releases.rancher.com/server-charts/latest
     ar e2e-rancher-communityalpha https://releases.rancher.com/server-charts/alpha
     helm repo update e2e-rancher-prime e2e-rancher-primerc e2e-rancher-primealpha e2e-rancher-community e2e-rancher-communityalpha e2e-jetstack > /dev/null
-    ar e2e-rancher-head-215 https://charts.optimus.rancher.io/server-charts/release-2.15
-    helm repo update e2e-rancher-head-215 > /dev/null
+    ar e2e-rancher-head-prime https://charts.optimus.rancher.io/server-charts/latest
+    ar e2e-rancher-head-community https://charts.optimus.rancher.io/server-charts/release-2.16
+    helm repo update e2e-rancher-head-prime e2e-rancher-head-community > /dev/null
 }
 
 # Find repository & highest version based on constraints
@@ -93,6 +94,12 @@ find_chart_by_constraints () {
 
     echo "QUERY: ${q_repo:--}:${q_ver:--}"
 
+    # Find latest head version by creation date
+    if [ "$q_repo" == "head" ]; then
+        q_ver=$(curl -fsSL https://charts.optimus.rancher.io/server-charts/latest/index.yaml |\
+            qver=${q_ver%-0} yq '.entries.rancher | map(select(.version | test(env(qver)))) | sort_by(.created) | .[-1].version')
+    fi
+
     # Find charts from Q_REPOs with version matching Q_VER, ordered by version
     [[ "$q_ver" =~ $EXCLUDE_PATTERN ]] || local expattern="$EXCLUDE_PATTERN"
     charts=$(helm search repo --fail-on-no-result -r "e2e-rancher-$q_repo.*/rancher" --version "$q_ver" --versions -o json | \
@@ -111,7 +118,8 @@ find_chart_by_constraints () {
         s|e2e-rancher-communityalpha/|3 &|
         s|e2e-rancher-primerc/|4 &|
         s|e2e-rancher-primealpha/|5 &|
-        s|e2e-rancher-head-[0-9]+/|6 &|' \
+        s|e2e-rancher-head-prime/|6 &|
+        s|e2e-rancher-head-community/|7 &|' \
         | sort -nr | awk 'END {print $2}')
 
     echo "CHART: ${CHART_REPO:--}:${CHART_VER:--}"
