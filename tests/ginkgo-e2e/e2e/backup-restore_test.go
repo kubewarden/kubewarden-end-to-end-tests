@@ -86,6 +86,8 @@ var _ = Describe("E2E - Install Kubewarden", Label("install-kubewarden"), func()
 		})
 		By("Deploying custom policy-server", func() {
 			// Get current version of policy-server
+			// Look to be some time out issue, just for test
+			time.Sleep(60 * time.Second)
 			policyServerImage, _ := kubectl.Run("get", "deployment", "policy-server-default",
 				"-n", "kubewarden", "-o", "jsonpath={.spec.template.spec.containers[0].image}")
 			Expect(policyServerImage).To(Not(BeEmpty()))
@@ -195,6 +197,7 @@ var _ = Describe("E2E - Test full Backup/Restore", Label("test-full-backup-resto
 			err = exec.Command("sudo", "cp", localPath+"/"+backupFile, ".").Run()
 			Expect(err).To(Not(HaveOccurred()))
 		})
+		os.Exit(3)
 
 		By("Uninstalling K3s", func() {
 			out, err := exec.Command("k3s-uninstall.sh").CombinedOutput()
