@@ -43,15 +43,22 @@ registries:
         endpoint:
           - http://k3d-docker.io:5000
 
-      # GHCR cache is used if k3d-ghcr.io registry exists, to create it run:
-      # k3d registry create ghcr.io --proxy-remote-url https://ghcr.io -v /var/cache/registry/ghcr-io:/var/lib/registry
+      # Used if k3d-ghcr.io registry exists
+      # k3d registry create ghcr.io --proxy-remote-url https://ghcr.io -v /var/cache/registry/ghcr-io:/var/lib/registry --image registry:3 --proxy-username "$USERNAME" --proxy-password "$PASSWORD"
       "ghcr.io":
         endpoint:
           - http://k3d-ghcr.io:5000
 
+      # Used if k3d-appco.io registry exists
+      # k3d registry create appco.io --proxy-remote-url https://dp.apps.rancher.io -v /var/cache/registry/appco-io:/var/lib/registry --image registry:3 --proxy-username "$USERNAME" --proxy-password "$PASSWORD"
+      "dp.apps.rancher.io":
+        endpoint:
+          - http://k3d-appco.io:5000
+
       "registry.suse.de":
         endpoint:
           - https://registry.suse.de/v2
+
     configs:
       "registry.suse.de":
         tls:
