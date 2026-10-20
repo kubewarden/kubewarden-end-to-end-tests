@@ -34,16 +34,18 @@ if [ "${1:-}" == 'create' ]; then
         generate_certs "$MTLS_DIR" mtls.kubewarden.io
     fi
 
-    # Detect pull-through cache for GHCR
-    k3d registry list k3d-ghcr.io --no-headers 2>/dev/null && PTC_GHCR="k3d-ghcr.io"
+    # Detect pull-through cache registries
+    registry_use=()
+    for r in k3d-ghcr.io k3d-appco.io; do
+        docker inspect "$r" &>/dev/null && registry_use+=(--registry-use "$r:5000")
+    done
 
     # /dev/mapper: https://k3d.io/v5.7.4/faq/faq/#issues-with-btrfs
     k3d cluster create "$CLUSTER_NAME" --wait \
-        --config config/k3d-config.yaml \
+        --config config/k3d-config.yaml "${registry_use[@]}" \
         --image "rancher/k3s:$K3S" \
         -s "$MASTER_COUNT" -a "$WORKER_COUNT" \
         -v "/dev/mapper:/dev/mapper@all:*" \
-        ${PTC_GHCR:+--registry-use $PTC_GHCR} \
         ${MTLS:+--k3s-arg '--kube-apiserver-arg=admission-control-config-file=/etc/mtls/admission.yaml@server:*'} \
         ${MTLS:+--volume "$MTLS_DIR:/etc/mtls@server:*"} \
         "${@:2}"
@@ -53,6 +55,9 @@ fi
 
 # Delete existing cluster
 if [ "${1:-}" == 'delete' ]; then
+    for r in k3d-ghcr.io k3d-appco.io; do
+        docker network disconnect "k3d-$CLUSTER_NAME" "$r" &>/dev/null || true
+    done
     k3d cluster delete "$CLUSTER_NAME"
 fi
 
