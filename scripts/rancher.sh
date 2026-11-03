@@ -97,7 +97,7 @@ find_chart_by_constraints () {
     # Find latest head version by creation date
     if [ "$q_repo" == "head" ]; then
         q_ver=$(curl -fsSL https://charts.optimus.rancher.io/server-charts/latest/index.yaml |\
-            qver=${q_ver%-0} yq '.entries.rancher | map(select(.version | test(env(qver)))) | sort_by(.created) | .[-1].version')
+            qver="^${q_ver%-0}" yq '.entries.rancher | map(select(.version | test(env(qver)))) | sort_by(.created) | .[-1].version')
     fi
 
     # Find charts from Q_REPOs with version matching Q_VER, ordered by version
